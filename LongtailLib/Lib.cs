@@ -208,6 +208,34 @@ namespace Longtail
 #else
         [DllImport("longtail.dll")]
 #endif
+        public unsafe static extern uint Longtail_FileInfos_GetPathCount(Longtail_FileInfos* file_infos);
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern string Longtail_FileInfos_GetPath(Longtail_FileInfos * file_infos, uint index);
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern ulong Longtail_FileInfos_GetSize(Longtail_FileInfos* file_infos, uint index);
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern uint Longtail_FileInfos_GetPermissions(Longtail_FileInfos* file_infos, uint index);
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
         public unsafe static extern int Longtail_GetFilesRecursively(
             Longtail_StorageAPI* storage_api,
             string root_path,
@@ -227,6 +255,22 @@ namespace Longtail
             Longtail_Paths* paths,
             ulong[] asset_sizes,
             uint[] asset_permissions,
+            uint[] asset_tags,
+            uint max_chunk_size,
+            ref Longtail_VersionIndex* out_version_index);
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern int Longtail_CreateVersionIndexUtil(
+            Longtail_StorageAPI* storage_api,
+            Longtail_HashAPI* hash_api,
+            Longtail_JobAPI* job_api,
+            Longtail_ProgressAPI* progress_api,
+            string root_path,
+            Longtail_FileInfos* file_infos,
             uint[] asset_tags,
             uint max_chunk_size,
             ref Longtail_VersionIndex* out_version_index);
@@ -352,6 +396,18 @@ namespace Longtail
             ulong[] chunk_hashes,
             uint[] chunk_sizes,
             uint[] chunk_tags,
+            uint max_block_size,
+            uint max_chunks_per_block,
+            ref Longtail_ContentIndex* out_content_index);
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern int Longtail_CreateContentIndexUtil(
+            Longtail_HashAPI* hash_api,
+            Longtail_VersionIndex* version_index,
             uint max_block_size,
             uint max_chunks_per_block,
             ref Longtail_ContentIndex* out_content_index);
@@ -618,5 +674,79 @@ namespace Longtail
         public unsafe static extern int Longtail_ValidateVersion(
             Longtail_ContentIndex* content_index,
             Longtail_VersionIndex* version_index);
+
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern uint Longtail_Hash_GetIdentifier(Longtail_HashAPI* hash_api);
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_HashAPI* Longtail_CreateBlake2HashAPI();
+//#if (DEBUG)
+//        [DllImport("longtail_debug.dll")]
+//#else
+//        [DllImport("longtail.dll")]
+//#endif
+//        public unsafe static extern uint GET_LONGTAIL_BLAKE2_HASH_TYPE();
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_HashAPI* Longtail_CreateBlake3HashAPI();
+//#if (DEBUG)
+//        [DllImport("longtail_debug.dll")]
+//#else
+//        [DllImport("longtail.dll")]
+//#endif
+//        public unsafe static extern uint GET_LONGTAIL_BLAKE3_HASH_TYPE();
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_HashAPI* Longtail_CreateMeowHashAPI();
+//#if (DEBUG)
+//        [DllImport("longtail_debug.dll")]
+//#else
+//        [DllImport("longtail.dll")]
+//#endif
+//        public unsafe static extern uint GET_LONGTAIL_MEOW_HASH_TYPE();
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_JobAPI* Longtail_CreateBikeshedJobAPI(ushort worker_count);
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern uint Longtail_Job_GetWorkerCount(Longtail_JobAPI* job_api);
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_StorageAPI* Longtail_CreateFSStorageAPI();
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_StorageAPI* Longtail_CreateInMemStorageAPI();
     }
 }

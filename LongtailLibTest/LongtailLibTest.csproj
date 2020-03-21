@@ -74,6 +74,10 @@
   <ItemGroup>
     <Compile Include="UnitTestCallbacks.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="UnitTestJobAPI.cs" />
+    <Compile Include="UnitTestHashAPI.cs" />
+    <Compile Include="UnitTestStorageAPI.cs" />
+    <Compile Include="UnitTestVersionIndex.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
