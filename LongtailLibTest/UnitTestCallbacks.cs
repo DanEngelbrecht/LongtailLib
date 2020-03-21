@@ -28,19 +28,17 @@ namespace LongtailLibTest
         [TestMethod]
         unsafe public void TestAssertCallback()
         {
-            Longtail.AssertCallback myAssertCallback = new Longtail.AssertCallback(AssertCB);
+            string given_assert_expression = "";
+            Longtail.AssertCallback myAssertCallback =
+                (string expression, string file, int line) =>
+                {
+                    given_assert_expression = expression;
+                };
             Longtail.Lib.Longtail_SetAssert(myAssertCallback);
             Longtail.Native_VersionIndex* version_index = null;
             Longtail.Lib.Longtail_ReadVersionIndexFromBuffer(null, 0, ref version_index);
             Longtail.Lib.Longtail_SetAssert(null);
             Assert.AreEqual("buffer != 0", given_assert_expression);
-        }
-
-        static string given_assert_expression;
-
-        public static void AssertCB(string expression, string file, int line)
-        {
-            given_assert_expression = expression;
         }
 
         [TestMethod]
