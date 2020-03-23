@@ -12,63 +12,61 @@ namespace LongtailLibTest
         {
             int log_level = -1;
             string log_string = "";
-            Longtail.LogCallback myLogCallBack =
+            LongtailLib.LogCallback myLogCallBack =
                 (void* context, int level, string str) =>
                 {
                     log_level = level;
                     log_string = str;
                 };
-            Longtail.Lib.Longtail_SetLogLevel(0);
-            Longtail.Lib.Longtail_SetLog(myLogCallBack, null);
-            Longtail.Lib.Longtail_SetLogLevel(1);
+            LongtailLib.API.Longtail_SetLogLevel(0);
+            LongtailLib.API.Longtail_SetLog(myLogCallBack, null);
+            LongtailLib.API.Longtail_SetLogLevel(1);
             Assert.AreEqual(log_level, 1);
             Assert.AreEqual(log_string, "Longtail_SetLogLevel(1)");
         }
-
+#if (DEBUG)
         [TestMethod]
         unsafe public void TestAssertCallback()
         {
             string given_assert_expression = "";
-            Longtail.AssertCallback myAssertCallback =
+            LongtailLib.AssertCallback myAssertCallback =
                 (string expression, string file, int line) =>
                 {
                     given_assert_expression = expression;
                 };
-            Longtail.Lib.Longtail_SetAssert(myAssertCallback);
-            Longtail.Longtail_VersionIndex* version_index = null;
-            //Longtail.Lib.Longtail_ReadVersionIndexFromBuffer(null, 0, ref version_index);
-            Longtail.Longtail_VersionIndex* dummy = null;
-            Longtail.Lib.Longtail_CreateVersionIndex(null, null, null, null, "", null, null, 0, ref dummy);
-            Longtail.Lib.Longtail_SetAssert(null);
+            LongtailLib.API.Longtail_SetAssert(myAssertCallback);
+            LongtailLib.Longtail_VersionIndex* dummy = null;
+            LongtailLib.API.Longtail_CreateVersionIndex(null, null, null, null, "", null, null, 0, ref dummy);
+            LongtailLib.API.Longtail_SetAssert(null);
             Assert.AreEqual("storage_api != 0", given_assert_expression);
         }
-
+#endif
         [TestMethod]
         unsafe public void TestProgress()
         {
-            ulong progress_api_size = Longtail.Lib.Longtail_GetProgressAPISize();
-            void* progress_api_mem = Longtail.Lib.Longtail_Alloc(progress_api_size);
-            Longtail.DisposeFunc my_progress_dispose =
-                (Longtail.Longtail_API* api) =>
+            ulong progress_api_size = LongtailLib.API.Longtail_GetProgressAPISize();
+            void* progress_api_mem = LongtailLib.API.Longtail_Alloc(progress_api_size);
+            LongtailLib.DisposeFunc my_progress_dispose =
+                (LongtailLib.Longtail_API* api) =>
                 {
-                    Longtail.Lib.Longtail_Free(api);
+                    LongtailLib.API.Longtail_Free(api);
                 };
             uint done = 0;
             uint total = 0;
-            Longtail.ProgressCallback my_progress_callback =
-                (Longtail.Longtail_ProgressAPI* progress_api, uint total_count, uint done_count) =>
+            LongtailLib.ProgressCallback my_progress_callback =
+                (LongtailLib.Longtail_ProgressAPI* progress_api, uint total_count, uint done_count) =>
                 {
                     done = done_count;
                     total = total_count;
                 };
-            Longtail.Longtail_ProgressAPI* my_progress_api = Longtail.Lib.Longtail_MakeProgressAPI(progress_api_mem, my_progress_dispose, my_progress_callback);
-            Longtail.Lib.Longtail_Progress_OnProgress(my_progress_api, 100, 50);
-            Longtail.Lib.Longtail_DisposeAPI((Longtail.Longtail_API*)(my_progress_api));
+            LongtailLib.Longtail_ProgressAPI* my_progress_api = LongtailLib.API.Longtail_MakeProgressAPI(progress_api_mem, my_progress_dispose, my_progress_callback);
+            LongtailLib.API.Longtail_Progress_OnProgress(my_progress_api, 100, 50);
+            LongtailLib.API.Longtail_DisposeAPI((LongtailLib.Longtail_API*)(my_progress_api));
             Assert.AreEqual((uint)50, done);
             Assert.AreEqual((uint)100, total);
         }
 
-        class MyProgress : Longtail.IProgress
+        class MyProgress : LongtailLib.IProgress
         {
             public void OnProgress(uint total_count, uint done_count)
             {
@@ -83,13 +81,14 @@ namespace LongtailLibTest
         public void TestProgressHandle()
         {
             MyProgress progress = new MyProgress();
-            Longtail.Lib.ProgressHandle progress_handle = new Longtail.Lib.ProgressHandle(progress);
-            Longtail.Lib.Progress_OnProgress(progress_handle, 100, 50);
+            LongtailLib.API.ProgressHandle progress_handle = new LongtailLib.API.ProgressHandle(progress);
+            LongtailLib.API.Progress_OnProgress(progress_handle, 100, 50);
             Assert.AreEqual((uint)50, progress.done);
             Assert.AreEqual((uint)100, progress.total);
+            progress_handle.Close();
         }
 
-        class MyOnComplete : Longtail.IAsyncComplete
+        class MyOnComplete : LongtailLib.IAsyncComplete
         {
             public void OnComplete(int err)
             {
@@ -102,8 +101,8 @@ namespace LongtailLibTest
         public void TestASyncCompleteHandle()
         {
             MyOnComplete onComplete = new MyOnComplete();
-            Longtail.Lib.ASyncCompleteHandle async_complete_handle = new Longtail.Lib.ASyncCompleteHandle(onComplete);
-            Longtail.Lib.ASyncComplete_OnComplete(async_complete_handle, 16);
+            LongtailLib.API.ASyncCompleteHandle async_complete_handle = new LongtailLib.API.ASyncCompleteHandle(onComplete);
+            LongtailLib.API.ASyncComplete_OnComplete(async_complete_handle, 16);
             Assert.AreEqual((int)16, onComplete.err);
         }
     }

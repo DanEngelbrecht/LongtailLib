@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29911.84
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Longtail", "LongtailLib\Longtail.csproj", "{D9445F5C-6EC8-4E93-8101-1B148A3B3C5C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LongtailLib", "LongtailLib\LongtailLib.csproj", "{D9445F5C-6EC8-4E93-8101-1B148A3B3C5C}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LongtailLibTest", "LongtailLibTest\LongtailLibTest.csproj", "{A3770D60-8AE7-4B9E-B652-B1FFF8DF6D7F}"
 EndProject

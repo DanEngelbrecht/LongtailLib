@@ -10,15 +10,15 @@ namespace LongtailLibTest
         [TestMethod]
         public unsafe void TestCreateInMemStorageAPI()
         {
-            Longtail.Longtail_StorageAPI* storage_api = Longtail.Lib.Longtail_CreateFSStorageAPI();
-            Longtail.Lib.Longtail_DisposeAPI((Longtail.Longtail_API*)storage_api);
+            LongtailLib.Longtail_StorageAPI* storage_api = LongtailLib.API.Longtail_CreateFSStorageAPI();
+            LongtailLib.API.Longtail_DisposeAPI((LongtailLib.Longtail_API*)storage_api);
         }
 
         [TestMethod]
         public unsafe void TestCreateFSStorageAPI()
         {
-            Longtail.Longtail_StorageAPI* storage_api = Longtail.Lib.Longtail_CreateInMemStorageAPI();
-            Longtail.Lib.Longtail_DisposeAPI((Longtail.Longtail_API*)storage_api);
+            LongtailLib.Longtail_StorageAPI* storage_api = LongtailLib.API.Longtail_CreateInMemStorageAPI();
+            LongtailLib.API.Longtail_DisposeAPI((LongtailLib.Longtail_API*)storage_api);
         }
     }
 }
