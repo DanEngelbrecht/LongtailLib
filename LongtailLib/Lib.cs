@@ -28,6 +28,9 @@ namespace Longtail
     public struct Longtail_VersionDiff { }
 
     public struct Longtail_FileInfos { }
+    public struct Longtail_CompressionAPI { }
+    public struct Longtail_CompressionAPI_Settings { }
+    public struct Longtail_CompressionRegistryAPI { }
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public unsafe delegate void DisposeFunc(Longtail_API* api);
@@ -202,69 +205,6 @@ namespace Longtail
 #endif
         public unsafe static extern void Longtail_AsyncComplete_OnComplete(Longtail_AsyncCompleteAPI* aSyncCompleteAPI, int res);
 
-
-
-
-        /*
-        -Longtail_DisposeAPI
-        Longtail_GetBlake2HashType
-        -Longtail_CreateBlake2HashAPI
-        Longtail_GetBlake3HashType
-        -Longtail_CreateBlake3HashAPI
-        Longtail_GetMeowHashType
-        -Longtail_CreateMeowHashAPI
-        -Longtail_Alloc
-        -Longtail_Free
-        Longtail_CreateLizardCompressionAPI
-        Longtail_CreateLZ4CompressionAPI
-        Longtail_CreateBrotliCompressionAPI
-        Longtail_CreateZStdCompressionAPI
-
-        Longtail_GetBrotliGenericMinQuality
-        Longtail_GetBrotliGenericDefaultQuality
-        Longtail_GetBrotliGenericMaxQuality
-        Longtail_GetBrotliTextMinQuality
-        Longtail_GetBrotliTextDefaultQuality
-        Longtail_GetBrotliTextMaxQuality
-        Longtail_GetLizardMinQuality
-        Longtail_GetLizardDefaultQuality
-        Longtail_GetLizardMaxQuality
-        Longtail_GetLZ4DefaultQuality
-        Longtail_GetZStdMinCompression
-        Longtail_GetZStdDefaultCompression
-        Longtail_GetZStdMaxCompression
-
-        -Longtail_CreateBikeshedJobAPI
-        Longtail_CreateDefaultCompressionRegistry
-        -Longtail_CreateFSStorageAPI
-        Longtail_CreateFSBlockStoreAPI
-        Longtail_CreateCacheBlockStoreAPI
-        Longtail_CreateCompressBlockStoreAPI
-        -Longtail_ReadVersionIndex
-        -Longtail_GetFilesRecursively
-        Longtail_BlockStore_GetIndex
-        -Longtail_CreateVersionIndex
-        -Longtail_CreateVersionDiff
-        -Longtail_ChangeVersion
-
-        Longtail_ConcatPath - probably not
-
-  */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #if (DEBUG)
         [DllImport("longtail_debug.dll")]
 #else
@@ -324,6 +264,13 @@ namespace Longtail
 #else
         [DllImport("longtail.dll")]
 #endif
+        public unsafe static extern int Longtail_ReadVersionIndexFromBuffer(void* buffer, ulong size, ref Longtail_VersionIndex* out_version_index);
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
         public unsafe static extern int Longtail_ReadVersionIndex(
             Longtail_StorageAPI* storage_api,
             string path,
@@ -367,15 +314,29 @@ namespace Longtail
 #else
         [DllImport("longtail.dll")]
 #endif
-        public unsafe static extern int Longtail_WriteVersion(
-            Longtail_BlockStoreAPI* block_storage_api,
-            Longtail_StorageAPI* version_storage_api,
-            Longtail_JobAPI* job_api,
-            Longtail_ProgressAPI* progress_api,
-            Longtail_ContentIndex* content_index,
-            Longtail_VersionIndex* version_index,
-            string version_path,
-            int retain_permissions);
+        public unsafe static extern uint Longtail_ContentIndex_GetHashAPI(Longtail_ContentIndex* content_index);
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern ulong Longtail_ContentIndex_GetBlockCount(Longtail_ContentIndex* content_index);
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern ulong Longtail_ContentIndex_GetChunkCount(Longtail_ContentIndex* content_index);
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern ulong Longtail_ContentIndex_BlockHashes(Longtail_ContentIndex* content_index);
+
 
 #if (DEBUG)
         [DllImport("longtail_debug.dll")]
@@ -439,6 +400,13 @@ namespace Longtail
 #else
         [DllImport("longtail.dll")]
 #endif
+        public unsafe static extern uint Longtail_GetBlake2HashType();
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
         public unsafe static extern Longtail_HashAPI* Longtail_CreateBlake3HashAPI();
 
 #if (DEBUG)
@@ -446,7 +414,21 @@ namespace Longtail
 #else
         [DllImport("longtail.dll")]
 #endif
+        public unsafe static extern uint Longtail_GetBlake3HashType();
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
         public unsafe static extern Longtail_HashAPI* Longtail_CreateMeowHashAPI();
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern uint Longtail_GetMeowHashType();
 
 #if (DEBUG)
         [DllImport("longtail_debug.dll")]
@@ -461,5 +443,156 @@ namespace Longtail
         [DllImport("longtail.dll")]
 #endif
         public unsafe static extern uint Longtail_Job_GetWorkerCount(Longtail_JobAPI* job_api);
+
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_CompressionAPI* Longtail_CreateLizardCompressionAPI();
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_CompressionAPI_Settings* Longtail_GetLizardMinQuality();
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_CompressionAPI_Settings* Longtail_GetLizardDefaultQuality();
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_CompressionAPI_Settings* Longtail_GetLizardMaxQuality();
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_CompressionAPI* Longtail_CreateLZ4CompressionAPI();
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_CompressionAPI_Settings* Longtail_GetLZ4DefaultQuality();
+
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_CompressionAPI* Longtail_CreateBrotliCompressionAPI();
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_CompressionAPI_Settings* Longtail_GetBrotliGenericMinQuality();
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_CompressionAPI_Settings* Longtail_GetBrotliGenericDefaultQuality();
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_CompressionAPI_Settings* Longtail_GetBrotliGenericMaxQuality();
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_CompressionAPI_Settings* Longtail_GetBrotliTextMinQuality();
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_CompressionAPI_Settings* Longtail_GetBrotliTextDefaultQuality();
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_CompressionAPI_Settings* Longtail_GetBrotliTextMaxQuality();
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_CompressionAPI* Longtail_CreateZStdCompressionAPI();
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_CompressionAPI_Settings* Longtail_GetZStdMinCompression();
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_CompressionAPI_Settings* Longtail_GetZStdDefaultQuality();
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_CompressionAPI_Settings* Longtail_GetZStdMaxQuality();
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_CompressionRegistryAPI* Longtail_CreateDefaultCompressionRegistry(
+            uint compression_type_count,
+            uint[] compression_types,
+            Longtail_CompressionAPI*[] compression_apis,
+            Longtail_CompressionAPI_Settings*[] compression_settings);
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_BlockStoreAPI* Longtail_CreateFSBlockStoreAPI(Longtail_StorageAPI* storage_api, string content_path);
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_BlockStoreAPI* Longtail_CreateCacheBlockStoreAPI(Longtail_BlockStoreAPI* local_block_store, Longtail_BlockStoreAPI* remote_block_store);
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern Longtail_BlockStoreAPI* Longtail_CreateCompressBlockStoreAPI(Longtail_BlockStoreAPI* backing_block_store, Longtail_CompressionRegistryAPI* compression_registry);
+
+#if (DEBUG)
+        [DllImport("longtail_debug.dll")]
+#else
+        [DllImport("longtail.dll")]
+#endif
+        public unsafe static extern int Longtail_BlockStore_GetIndex(Longtail_BlockStoreAPI* block_store_api, Longtail_JobAPI* job_api, uint default_hash_api_identifier, Longtail_ProgressAPI* progress_api, ref Longtail_ContentIndex* out_content_index);
     }
 }
