@@ -21,22 +21,23 @@ namespace LongtailLibTest
             Longtail.Longtail_HashAPI* hash_api = Longtail.Lib.Longtail_CreateBlake3HashAPI();
             Longtail.Longtail_JobAPI* job_api = Longtail.Lib.Longtail_CreateBikeshedJobAPI(4);
             Longtail.Longtail_FileInfos* file_infos = null;
-            int err = Longtail.Lib.Longtail_GetFilesRecursively(storage_api, "sample_folder", ref file_infos);
+            int err = Longtail.Lib.Longtail_GetFilesRecursively(storage_api, "D:\\github\\DanEngelbrecht\\LongtailLib\\LongtailLibTest\\TestData\\sample_folder", ref file_infos);
             Assert.AreEqual(0, err);
             Longtail.Longtail_VersionIndex* version_index = null;
-            uint file_count = Longtail.Lib.Longtail_FileInfos_GetPathCount(file_infos);
-            Assert.AreEqual((uint)18, file_count);
-            uint[] asset_tags = new uint[file_count];
-            for (uint i = 0; i < file_count; ++i)
+            Longtail.Longtail_Paths* paths = Longtail.Lib.Longtail_FileInfos_GetPaths(file_infos);
+            uint path_count = Longtail.Lib.Longtail_Paths_GetCount(paths);
+            Assert.AreEqual((uint)18, path_count);
+            uint[] asset_tags = new uint[path_count];
+            for (uint i = 0; i < path_count; ++i)
             {
                 asset_tags[i] = 0;
             }
-            err = Longtail.Lib.Longtail_CreateVersionIndexUtil(
+            err = Longtail.Lib.Longtail_CreateVersionIndex(
                 storage_api,
                 hash_api,
                 job_api,
                 null,
-                "sample_folder",
+                "D:\\github\\DanEngelbrecht\\LongtailLib\\LongtailLibTest\\TestData\\sample_folder",
                 file_infos,
                 asset_tags,
                 512,

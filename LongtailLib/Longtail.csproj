@@ -14,12 +14,20 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Update="longtail.dll">
+    <None Remove="longtail.dll" />
+    <None Remove="longtail_debug.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="longtail.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="longtail_debug.dll">
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="longtail_debug.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    </Content>
   </ItemGroup>
 
 </Project>

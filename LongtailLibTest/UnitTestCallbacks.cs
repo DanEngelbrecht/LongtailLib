@@ -36,9 +36,11 @@ namespace LongtailLibTest
                 };
             Longtail.Lib.Longtail_SetAssert(myAssertCallback);
             Longtail.Longtail_VersionIndex* version_index = null;
-            Longtail.Lib.Longtail_ReadVersionIndexFromBuffer(null, 0, ref version_index);
+            //Longtail.Lib.Longtail_ReadVersionIndexFromBuffer(null, 0, ref version_index);
+            Longtail.Longtail_VersionIndex* dummy = null;
+            Longtail.Lib.Longtail_CreateVersionIndex(null, null, null, null, "", null, null, 0, ref dummy);
             Longtail.Lib.Longtail_SetAssert(null);
-            Assert.AreEqual("buffer != 0", given_assert_expression);
+            Assert.AreEqual("storage_api != 0", given_assert_expression);
         }
 
         [TestMethod]
