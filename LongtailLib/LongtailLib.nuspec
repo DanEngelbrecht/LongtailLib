@@ -1,0 +1,26 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
+  <metadata>
+    <id>LongtailLib</id>
+    <version>1.0.12</version>
+    <title></title>
+    <authors>dan.engelbrecht</authors>
+    <owners>dan.engelbrecht</owners>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <projectUrl>https://github.com/DanEngelbrecht/LongtailLib/</projectUrl>
+    <license type="expression">MIT</license>
+    <description>A C# wrapper for the longtail native library</description>
+    <dependencies>
+      <group targetFramework=".NETStandard2.0">
+        <dependency id="NETStandard.Library" version="2.0.3" exclude="Build,Analyzers" />
+      </group>
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="build\netstandard2.0\LongtailLib.targets" target="build\netstandard2.0\LongtailLib.targets" />
+    <file src="runtimes\win\native\longtail_winx64_debug.dll" target="runtimes\win\native\longtail_winx64_debug.dll" />
+    <file src="runtimes\win\native\longtail_winx64.dll" target="runtimes\win\native\longtail_winx64.dll" />
+    <file src="bin\Release\netstandard2.0\LongtailLib.dll" target="lib\netstandard2.0\LongtailLib.dll" />
+    <file src="bin\Release\netstandard2.0\LongtailLib.pdb" target="lib\netstandard2.0\LongtailLib.pdb" />
+  </files>
+</package>
