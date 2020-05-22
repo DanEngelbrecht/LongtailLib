@@ -1177,9 +1177,9 @@ namespace LongtailLib
         {
             return SafeNativeMethods.Longtail_GetMeowHashType();
         }
-        public unsafe static JobAPI CreateBikeshedJobAPI(UInt32 workerCount)
+        public unsafe static JobAPI CreateBikeshedJobAPI(UInt32 workerCount, int workerPriority)
         {
-            return new JobAPI(SafeNativeMethods.Longtail_CreateBikeshedJobAPI(workerCount));
+            return new JobAPI(SafeNativeMethods.Longtail_CreateBikeshedJobAPI(workerCount, workerPriority));
         }
         public unsafe static HashRegistryAPI CreateFullHashRegistry()
         {
@@ -2590,7 +2590,7 @@ namespace LongtailLib
         internal unsafe static extern UInt32 Longtail_GetMeowHashType();
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
-        internal unsafe static extern NativeJobAPI* Longtail_CreateBikeshedJobAPI(UInt32 worker_count);
+        internal unsafe static extern NativeJobAPI* Longtail_CreateBikeshedJobAPI(UInt32 worker_count, int worker_priority);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern UInt32 Longtail_Job_GetWorkerCount(NativeJobAPI* job_api);
