@@ -22,10 +22,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Update="win10-x64\native\longtail_winx64.dll">
+    <None Update="win10-x64\native\longtail_win32_x64.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="win10-x64\native\longtail_winx64_debug.dll">
+    <None Update="win10-x64\native\longtail_win32_x64_debug.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>

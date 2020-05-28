@@ -1,14 +1,24 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <ItemGroup>
-      <Content Include="$(MSBuildThisFileDirectory)..\..\runtimes\win\native\longtail_winx64_debug.dll">
+      <Content Include="$(MSBuildThisFileDirectory)..\..\runtimes\win\native\longtail_win32_x64_debug.dll">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        <Link>longtail_winx64_debug.dll</Link>
+        <Link>longtail_win32_x64_debug.dll</Link>
         <Visible>false</Visible>
       </Content>
-      <Content Include="$(MSBuildThisFileDirectory)..\..\runtimes\win\native\longtail_winx64.dll">
+      <Content Include="$(MSBuildThisFileDirectory)..\..\runtimes\win\native\longtail_win32_x64_debug.pdb">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        <Link>longtail_winx64.dll</Link>
+        <Link>longtail_win32_x64_debug.pdb</Link>
+        <Visible>false</Visible>
+      </Content>
+      <Content Include="$(MSBuildThisFileDirectory)..\..\runtimes\win\native\longtail_win32_x64.dll">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        <Link>longtail_win32_x64.dll</Link>
+        <Visible>false</Visible>
+      </Content>
+      <Content Include="$(MSBuildThisFileDirectory)..\..\runtimes\win\native\longtail_win32_x64.pdb">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        <Link>longtail_win32_x64.pdb</Link>
         <Visible>false</Visible>
       </Content>
     </ItemGroup>

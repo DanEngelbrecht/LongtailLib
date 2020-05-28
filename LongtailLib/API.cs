@@ -2104,9 +2104,9 @@ namespace LongtailLib
     internal static class SafeNativeMethods
     {
 #if DEBUG
-        const string LongtailDLLName = "longtail_winx64_debug.dll";
+        const string LongtailDLLName = "longtail_win32_x64_debug.dll";
 #else
-        const string LongtailDLLName = "longtail_winx64.dll";
+        const string LongtailDLLName = "longtail_win32_x64.dll";
 #endif
         public const int EPERM = 1;    /* Not super-user */
         public const int ENOENT = 2;   /* No such file or directory */
