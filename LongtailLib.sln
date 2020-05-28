@@ -5,7 +5,7 @@ VisualStudioVersion = 16.0.29926.136
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LongtailLib", "LongtailLib\LongtailLib.csproj", "{111C9918-0476-4248-BFE8-DA426013A90E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestLongtailLib", "TestLongtailLib\TestLongtailLib.csproj", "{5E7DDC9B-B99A-482B-B1C8-087E31275769}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestLongtailLib", "TestLongtailLib\TestLongtailLib.csproj", "{5E7DDC9B-B99A-482B-B1C8-087E31275769}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,12 +15,12 @@ Global
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{111C9918-0476-4248-BFE8-DA426013A90E}.Debug|x64.ActiveCfg = Debug|x64
 		{111C9918-0476-4248-BFE8-DA426013A90E}.Debug|x64.Build.0 = Debug|x64
-		{111C9918-0476-4248-BFE8-DA426013A90E}.Release|x64.ActiveCfg = Release|Any CPU
-		{111C9918-0476-4248-BFE8-DA426013A90E}.Release|x64.Build.0 = Release|Any CPU
+		{111C9918-0476-4248-BFE8-DA426013A90E}.Release|x64.ActiveCfg = Debug|x64
+		{111C9918-0476-4248-BFE8-DA426013A90E}.Release|x64.Build.0 = Debug|x64
 		{5E7DDC9B-B99A-482B-B1C8-087E31275769}.Debug|x64.ActiveCfg = Debug|x64
 		{5E7DDC9B-B99A-482B-B1C8-087E31275769}.Debug|x64.Build.0 = Debug|x64
-		{5E7DDC9B-B99A-482B-B1C8-087E31275769}.Release|x64.ActiveCfg = Release|Any CPU
-		{5E7DDC9B-B99A-482B-B1C8-087E31275769}.Release|x64.Build.0 = Release|Any CPU
+		{5E7DDC9B-B99A-482B-B1C8-087E31275769}.Release|x64.ActiveCfg = Debug|x64
+		{5E7DDC9B-B99A-482B-B1C8-087E31275769}.Release|x64.Build.0 = Debug|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
