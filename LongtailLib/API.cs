@@ -2323,8 +2323,6 @@ namespace LongtailLib
             UInt64* m_BlockHashes;
             UInt64* m_ChunkHashes;
             UInt64* m_ChunkBlockIndexes;
-            UInt32* m_ChunkBlockOffsets;
-            UInt32* m_ChunkLengths;
 
             public unsafe UInt32 GetHashIdentifier() { return *m_HashIdentifier; }
             public unsafe UInt32 GetMaxBlockSize() { return *m_MaxBlockSize; }
