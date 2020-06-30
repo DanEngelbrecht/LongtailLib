@@ -551,6 +551,10 @@ namespace LongtailLib
             {
                 return SafeNativeMethods.ENOMEM;
             }
+            if (typeof(UnauthorizedAccessException).Equals(ex.GetType()))
+            {
+                return SafeNativeMethods.EACCES;
+            }
             if (typeof(IOException).Equals(ex.GetType()))
             {
                 return SafeNativeMethods.EIO;
@@ -1212,7 +1216,7 @@ namespace LongtailLib
             if (contentPath == null) { throw new ArgumentException("CreateFSBlockStoreAPI contentPath is null"); }
 
             var cStorageAPI = storageAPI.Native;
-            return new BlockStoreAPI(SafeNativeMethods.Longtail_CreateFSBlockStoreAPI(cStorageAPI, contentPath, default_max_block_size, default_max_chunks_per_block));
+            return new BlockStoreAPI(SafeNativeMethods.Longtail_CreateFSBlockStoreAPI(cStorageAPI, contentPath, default_max_block_size, default_max_chunks_per_block, null));
         }
         public unsafe static BlockStoreAPI CreateCacheBlockStoreAPI(BlockStoreAPI localBlockStore, BlockStoreAPI remoteBlockStore)
         {
@@ -2605,7 +2609,7 @@ namespace LongtailLib
         internal unsafe static extern NativeCompressionRegistryAPI* Longtail_CreateFullCompressionRegistry();
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        internal unsafe static extern NativeBlockStoreAPI* Longtail_CreateFSBlockStoreAPI(NativeStorageAPI* storage_api, [MarshalAs(UnmanagedType.LPStr)] string content_path, UInt32 default_max_block_size, UInt32 default_max_chunks_per_block);
+        internal unsafe static extern NativeBlockStoreAPI* Longtail_CreateFSBlockStoreAPI(NativeStorageAPI* storage_api, [MarshalAs(UnmanagedType.LPStr)] string content_path, UInt32 default_max_block_size, UInt32 default_max_chunks_per_block, [MarshalAs(UnmanagedType.LPStr)] string optional_block_extension);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern NativeBlockStoreAPI* Longtail_CreateCacheBlockStoreAPI(NativeBlockStoreAPI* local_block_store, NativeBlockStoreAPI* remote_block_store);
