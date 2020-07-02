@@ -994,16 +994,22 @@ namespace LongtailLib
             ThrowExceptionFromErrno("RetargetContent", "", err);
             return null;
         }
-        public unsafe static ContentIndex MergeContentIndex(ContentIndex localContentIndex, ContentIndex newContentIndex)
+        public unsafe static ContentIndex MergeContentIndex(
+            JobAPI jobAPI,
+            ContentIndex localContentIndex,
+            ContentIndex newContentIndex)
         {
+            if (jobAPI == null) { throw new ArgumentException("MergeContentIndex jobAPI is null"); }
             if (localContentIndex == null) { throw new ArgumentException("MergeContentIndex localContentIndex is null"); }
             if (newContentIndex == null) { throw new ArgumentException("MergeContentIndex newContentIndex is null"); }
 
             var cLocalContentIndex = localContentIndex.Native;
             var cNewIndex = newContentIndex.Native;
+            var cJobAPI = jobAPI.Native;
 
             SafeNativeMethods.NativeContentIndex* nativeContentIndex = null;
             int err = SafeNativeMethods.Longtail_MergeContentIndex(
+                cJobAPI,
                 cLocalContentIndex,
                 cNewIndex,
                 ref nativeContentIndex);
@@ -1210,22 +1216,43 @@ namespace LongtailLib
         {
             return new CompressionRegistryAPI(SafeNativeMethods.Longtail_CreateFullCompressionRegistry());
         }
-        public unsafe static BlockStoreAPI CreateFSBlockStoreAPI(StorageAPI storageAPI, string contentPath, UInt32 default_max_block_size, UInt32 default_max_chunks_per_block)
+        public unsafe static BlockStoreAPI CreateFSBlockStoreAPI(
+            JobAPI jobAPI,
+            StorageAPI storageAPI,
+            string contentPath,
+            UInt32 default_max_block_size,
+            UInt32 default_max_chunks_per_block)
         {
+            if (jobAPI == null) { throw new ArgumentException("CreateFSBlockStoreAPI jobAPI is null"); }
             if (storageAPI == null) { throw new ArgumentException("CreateFSBlockStoreAPI storageAPI is null"); }
             if (contentPath == null) { throw new ArgumentException("CreateFSBlockStoreAPI contentPath is null"); }
 
             var cStorageAPI = storageAPI.Native;
-            return new BlockStoreAPI(SafeNativeMethods.Longtail_CreateFSBlockStoreAPI(cStorageAPI, contentPath, default_max_block_size, default_max_chunks_per_block, null));
+            var cJobAPI = jobAPI.Native;
+
+            return new BlockStoreAPI(SafeNativeMethods.Longtail_CreateFSBlockStoreAPI(
+                cJobAPI,
+                cStorageAPI,
+                contentPath,
+                default_max_block_size,
+                default_max_chunks_per_block,
+                null));
         }
-        public unsafe static BlockStoreAPI CreateCacheBlockStoreAPI(BlockStoreAPI localBlockStore, BlockStoreAPI remoteBlockStore)
+        public unsafe static BlockStoreAPI CreateCacheBlockStoreAPI(
+            JobAPI jobAPI,
+            BlockStoreAPI localBlockStore,
+            BlockStoreAPI remoteBlockStore)
         {
+            if (jobAPI == null) { throw new ArgumentException("CreateCacheBlockStoreAPI jobAPI is null"); }
             if (localBlockStore == null) { throw new ArgumentException("CreateCacheBlockStoreAPI localBlockStore is null"); }
             if (remoteBlockStore == null) { throw new ArgumentException("CreateCacheBlockStoreAPI remoteBlockStore is null"); }
 
             var cLocalBlockStore = localBlockStore.Native;
             var cRemoteBlockStore = remoteBlockStore.Native;
+            var cJobAPI = jobAPI.Native;
+
             return new BlockStoreAPI(SafeNativeMethods.Longtail_CreateCacheBlockStoreAPI(
+                cJobAPI,
                 cLocalBlockStore,
                 cRemoteBlockStore));
         }
@@ -2525,7 +2552,7 @@ namespace LongtailLib
         internal unsafe static extern int Longtail_RetargetContent(NativeContentIndex* reference_content_index, NativeContentIndex* content_index, ref NativeContentIndex* out_content_index);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
-        internal unsafe static extern int Longtail_MergeContentIndex(NativeContentIndex* local_content_index, NativeContentIndex* new_content_index, ref NativeContentIndex* out_content_index);
+        internal unsafe static extern int Longtail_MergeContentIndex(NativeJobAPI* job_api, NativeContentIndex* local_content_index, NativeContentIndex* new_content_index, ref NativeContentIndex* out_content_index);
 
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
@@ -2607,10 +2634,10 @@ namespace LongtailLib
         internal unsafe static extern NativeCompressionRegistryAPI* Longtail_CreateFullCompressionRegistry();
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        internal unsafe static extern NativeBlockStoreAPI* Longtail_CreateFSBlockStoreAPI(NativeStorageAPI* storage_api, [MarshalAs(UnmanagedType.LPStr)] string content_path, UInt32 default_max_block_size, UInt32 default_max_chunks_per_block, [MarshalAs(UnmanagedType.LPStr)] string optional_block_extension);
+        internal unsafe static extern NativeBlockStoreAPI* Longtail_CreateFSBlockStoreAPI(NativeJobAPI* job_api, NativeStorageAPI* storage_api, [MarshalAs(UnmanagedType.LPStr)] string content_path, UInt32 default_max_block_size, UInt32 default_max_chunks_per_block, [MarshalAs(UnmanagedType.LPStr)] string optional_block_extension);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
-        internal unsafe static extern NativeBlockStoreAPI* Longtail_CreateCacheBlockStoreAPI(NativeBlockStoreAPI* local_block_store, NativeBlockStoreAPI* remote_block_store);
+        internal unsafe static extern NativeBlockStoreAPI* Longtail_CreateCacheBlockStoreAPI(NativeJobAPI* job_api, NativeBlockStoreAPI* local_block_store, NativeBlockStoreAPI* remote_block_store);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern NativeBlockStoreAPI* Longtail_CreateCompressBlockStoreAPI(NativeBlockStoreAPI* backing_block_store, NativeCompressionRegistryAPI* compression_registry);

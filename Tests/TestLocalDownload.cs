@@ -160,15 +160,6 @@ namespace Tests
                 cancellationToken);
 
             TestBlockStorage remoteBlockStore = new TestBlockStorage(storePath);
-            ContentIndex remoteContentIndex = await UpdateUtil.GetContentIndex(remoteBlockStore);
-            var cacheLocalBlockStore = API.CreateFSBlockStoreAPI(cacheStorage, cachePath, 8388608, 1024);
-            var cacheLocalContentIndex = await API.BlockStoreGetIndex(cacheLocalBlockStore).ConfigureAwait(false);
-//            var fullContentIndex = API.MergeContentIndex(remoteContentIndex, cacheLocalContentIndex);
-
-//            UInt64[] missingBlocks = await UpdateUtil.GetMissingBlocks(
-//                cacheLocalContentIndex,
-//                fullContentIndex,
-//                targetVersionIndex);
 
             DebugProgress updateProgress = new DebugProgress("Updating");
 
@@ -178,18 +169,13 @@ namespace Tests
                 remoteBlockStore,
                 targetStorage,
                 targetPath,
-//                fullContentIndex,
                 currentVersionIndex,
                 targetVersionIndex,
                 (UInt32 totalCount, UInt32 doneCount) => { updateProgress.OnProgress(totalCount, doneCount); },
                 cancellationToken);
 
-//            fullContentIndex.Dispose();
-            cacheLocalContentIndex.Dispose();
-            cacheLocalBlockStore.Dispose();
             currentVersionIndex.Dispose();
             targetVersionIndex.Dispose();
-            remoteContentIndex.Dispose();
 
             cacheStorage.Dispose();
             targetStorage.Dispose();

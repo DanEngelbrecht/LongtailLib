@@ -104,8 +104,8 @@ namespace LongtailLib
             using (var hashRegistry = API.CreateFullHashRegistry())
             using (var compressionRegistryAPI = API.CreateFullCompressionRegistry())
             using (var remoteBlockStore = API.MakeBlockStore(remoteBlockStoreInterface))
-            using (var cacheLocalBlockStore = API.CreateFSBlockStoreAPI(cacheStorage, cachePath, 8388608, 1024))
-            using (var cacheBlockStore = API.CreateCacheBlockStoreAPI(cacheLocalBlockStore, remoteBlockStore))
+            using (var cacheLocalBlockStore = API.CreateFSBlockStoreAPI(jobAPI, cacheStorage, cachePath, 8388608, 1024))
+            using (var cacheBlockStore = API.CreateCacheBlockStoreAPI(jobAPI, cacheLocalBlockStore, remoteBlockStore))
             using (var compressionBlockStore = API.CreateCompressBlockStoreAPI(cacheBlockStore, compressionRegistryAPI))
             using (var blockStore = API.CreateShareBlockStoreAPI(compressionBlockStore))
             {
