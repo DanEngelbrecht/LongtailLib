@@ -1258,7 +1258,7 @@ namespace LongtailLib
         }
         public unsafe static BlockStoreAPI CreateCompressBlockStoreAPI(BlockStoreAPI backingBlockStore, CompressionRegistryAPI compressionRegistry)
         {
-            if (backingBlockStore == null) { throw new ArgumentException("CreateCompressBlockStoreAPI compressionRegistry is null"); }
+            if (backingBlockStore == null) { throw new ArgumentException("CreateCompressBlockStoreAPI backingBlockStore is null"); }
             if (compressionRegistry == null) { throw new ArgumentException("CreateCompressBlockStoreAPI compressionRegistry is null"); }
 
             var cBackingBlockStore = backingBlockStore.Native;
@@ -1267,9 +1267,18 @@ namespace LongtailLib
                 cBackingBlockStore,
                 cCompressionRegistry));
         }
+        public unsafe static BlockStoreAPI CreateLRUBlockStoreAPI(BlockStoreAPI backingBlockStore, UInt32 maxLRUBlockCount)
+        {
+            if (backingBlockStore == null) { throw new ArgumentException("CreateLRUBlockStoreAPI backingBlockStore is null"); }
+
+            var cBackingBlockStore = backingBlockStore.Native;
+            return new BlockStoreAPI(SafeNativeMethods.Longtail_CreateLRUBlockStoreAPI(
+                cBackingBlockStore,
+                maxLRUBlockCount));
+        }
         public unsafe static BlockStoreAPI CreateShareBlockStoreAPI(BlockStoreAPI backingBlockStore)
         {
-            if (backingBlockStore == null) { throw new ArgumentException("CreateShareBlockStoreAPI compressionRegistry is null"); }
+            if (backingBlockStore == null) { throw new ArgumentException("CreateShareBlockStoreAPI backingBlockStore is null"); }
 
             var cBackingBlockStore = backingBlockStore.Native;
             return new BlockStoreAPI(SafeNativeMethods.Longtail_CreateShareBlockStoreAPI(cBackingBlockStore));
@@ -2641,6 +2650,9 @@ namespace LongtailLib
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern NativeBlockStoreAPI* Longtail_CreateCompressBlockStoreAPI(NativeBlockStoreAPI* backing_block_store, NativeCompressionRegistryAPI* compression_registry);
+
+        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
+        internal unsafe static extern NativeBlockStoreAPI* Longtail_CreateLRUBlockStoreAPI(NativeBlockStoreAPI* backing_block_store, UInt32 maxLRUCount);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern NativeBlockStoreAPI* Longtail_CreateShareBlockStoreAPI(NativeBlockStoreAPI* backing_block_store);
