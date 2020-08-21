@@ -6,29 +6,6 @@ namespace LongtailLib
 {
     public class UpdateUtil
     {
-        public static async Task<ContentIndex> GetContentIndex(
-            IBlockStore blockStore)
-        {
-            return await Task.Run(() =>
-            {
-                var eventHandle = new EventWaitHandle(false, EventResetMode.AutoReset);
-                ContentIndex result = null;
-                Exception err = null;
-                blockStore.GetIndex((ContentIndex contentIndex, Exception e) =>
-                {
-                    result = contentIndex;
-                    err = e;
-                    eventHandle.Set();
-                });
-                eventHandle.WaitOne();
-                if (err != null)
-                {
-                    throw err;
-                }
-                return result;
-            }).ConfigureAwait(false);
-        }
-
         public static async Task<VersionIndex> GetCurrentVersionIndex(
             StorageAPI installStorage,
             string installPath,
@@ -65,29 +42,6 @@ namespace LongtailLib
             }
         }
 
-        public static async Task<UInt64[]> GetMissingBlocks(
-            ContentIndex cacheContentIndex,
-            ContentIndex remoteContentIndex,
-            VersionIndex targetVersionIndex)
-        {
-            using (var hashRegistry = API.CreateFullHashRegistry())
-            {
-                UInt32 hashIdentifier = remoteContentIndex.HashIdentifier;
-                if (hashIdentifier == 0)
-                {
-                    hashIdentifier = targetVersionIndex.HashIdentifier;
-                }
-                else if (hashIdentifier != targetVersionIndex.HashIdentifier)
-                {
-                    throw new Exception("Remote store and target version index does not match on hash API");
-                }
-
-                HashAPI hashAPI = API.GetHashAPI(hashRegistry, hashIdentifier);
-                var blockHashes = await GetMissingBlocks(hashAPI, cacheContentIndex, remoteContentIndex, targetVersionIndex).ConfigureAwait(false);
-                return blockHashes;
-            }
-        }
-
         public static async Task<BlockStoreStats> UpdateVersion(
             StorageAPI cacheStorage,
             string cachePath,
@@ -108,23 +62,13 @@ namespace LongtailLib
             using (var cacheBlockStore = API.CreateCacheBlockStoreAPI(jobAPI, cacheLocalBlockStore, remoteBlockStore))
             using (var compressionBlockStore = API.CreateCompressBlockStoreAPI(cacheBlockStore, compressionRegistryAPI))
             using (var blockStore = API.CreateShareBlockStoreAPI(compressionBlockStore))
+            using (var hashAPI = API.GetHashAPI(hashRegistry, targetVersionIndex.HashIdentifier))
+            using (var versionDiff = API.CreateVersionDiff(hashAPI, currentVersionIndex, targetVersionIndex))
+            using (var versionContentIndex = API.CreateContentIndexFromDiff(hashAPI, targetVersionIndex, versionDiff, 8388608, 1024))
             {
-                UInt32 targetChunkSize = targetVersionIndex.TargetChunkSize;
 
-                using (var remoteContentIndex = await LongtailLib.API.BlockStoreGetIndex(blockStore))
+                using (var remoteContentIndex = await LongtailLib.API.RetargetContentIndex(blockStore, versionContentIndex))
                 {
-                    UInt32 hashIdentifier = remoteContentIndex.HashIdentifier;
-                    if (hashIdentifier == 0)
-                    {
-                        hashIdentifier = targetVersionIndex.HashIdentifier;
-                    }
-                    else if (hashIdentifier != targetVersionIndex.HashIdentifier)
-                    {
-                        throw new Exception("Remote store and target version index does not match on hash API");
-                    }
-
-                    HashAPI hashAPI = API.GetHashAPI(hashRegistry, hashIdentifier);
-
                     await ChangeVersion(
                         blockStore,
                         installStorage,
@@ -133,6 +77,7 @@ namespace LongtailLib
                         remoteContentIndex,
                         currentVersionIndex,
                         targetVersionIndex,
+                        versionDiff,
                         installPath,
                         updateProgress,
                         cancellationToken).ConfigureAwait(false);
@@ -184,53 +129,27 @@ namespace LongtailLib
             ContentIndex remoteContentIndex,
             VersionIndex currentVersionIndex,
             VersionIndex targetVersionIndex,
+            VersionDiff versionDiff,
             string installPathInLocalStorageAPI,
             ProgressFunc updateProgress,
             CancellationToken cancellationToken)
         {
             await Task.Run(() =>
             {
-                using (var versionDiff = API.CreateVersionDiff(
+                API.SetLogLevel(API.LOG_LEVEL_DEBUG);
+                API.ChangeVersion(
+                        blockStore,
+                        localStorageAPI,
+                        hashAPI,
+                        jobAPI,
+                        updateProgress,
+                        cancellationToken,
+                        remoteContentIndex,
                         currentVersionIndex,
-                        targetVersionIndex))
-                {
-                    API.SetLogLevel(API.LOG_LEVEL_DEBUG);
-                    API.ChangeVersion(
-                            blockStore,
-                            localStorageAPI,
-                            hashAPI,
-                            jobAPI,
-                            updateProgress,
-                            cancellationToken,
-                            remoteContentIndex,
-                            currentVersionIndex,
-                            targetVersionIndex,
-                            versionDiff,
-                            installPathInLocalStorageAPI,
-                            false); // On windows we don't care about retaining permissions
-                }
-            }).ConfigureAwait(false);
-        }
-
-        private static async Task<UInt64[]> GetMissingBlocks(
-            HashAPI hashAPI,
-            ContentIndex cacheContentIndex,
-            ContentIndex remoteContentIndex,
-            VersionIndex targetVersionIndex)
-        {
-            return await Task.Run(() =>
-            {
-                using (var missingContentIndex = API.CreateMissingContent(
-                    hashAPI,
-                    cacheContentIndex,
-                    targetVersionIndex,
-                    remoteContentIndex.MaxBlockSize,
-                    remoteContentIndex.MaxChunksPerBlock))
-                using (var retargettedContentIndex = API.RetargetContent(remoteContentIndex, missingContentIndex))
-                {
-                    UInt64[] blockHashes = API.ContentIndexBlockHashes(retargettedContentIndex);
-                    return blockHashes;
-                }
+                        targetVersionIndex,
+                        versionDiff,
+                        installPathInLocalStorageAPI,
+                        false); // On windows we don't care about retaining permissions
             }).ConfigureAwait(false);
         }
     }

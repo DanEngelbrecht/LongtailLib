@@ -16,14 +16,8 @@ namespace Tests
         {
             m_StoragePath = storagePath;
         }
-        public void GetIndex(OnGetIndexComplete completeCallback)
-        {
-            byte[] contentIndexBuffer = File.ReadAllBytes(m_StoragePath + "\\store.lci");
-            ContentIndex contentIndex = API.ReadContentIndexFromBuffer(contentIndexBuffer);
-            completeCallback(contentIndex, null);
-        }
 
-        public void PreflightGet(UInt64 blockCount, UInt64[] blockHashes, uint[] blockRefCounts)
+        public void PreflightGet(ContentIndex contentIndex)
         {
         }
 
@@ -49,6 +43,11 @@ namespace Tests
         public void RetargetContent(ContentIndex contentIndex, OnRetargetContentComplete completeCallback)
         {
             throw new NotImplementedException();
+        }
+
+        public void Flush(OnFlushComplete completeCallback)
+        {
+            completeCallback(null);
         }
 
         private string m_StoragePath;
