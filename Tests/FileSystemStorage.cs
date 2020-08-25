@@ -399,6 +399,16 @@ namespace LongtailLib
             return isDir;
         }
 
+        void IStorage.LockFile(string path, ref IntPtr outLockFile)
+        {
+            throw new NotImplementedException();
+        }
+
+        void IStorage.UnlockFile(IntPtr lockFile)
+        {
+            throw new NotImplementedException();
+        }
+
         IFileSystem m_FileSystem;
 
         struct OpenFile

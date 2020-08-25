@@ -219,6 +219,32 @@ namespace LongtailLib
         }
     }
 
+    public unsafe sealed class ChunkerAPI : IDisposable
+    {
+        SafeNativeMethods.NativeChunkerAPI* _Native;
+        internal ChunkerAPI(SafeNativeMethods.NativeChunkerAPI* nativeChunkerAPI)
+        {
+            _Native = nativeChunkerAPI;
+        }
+        internal SafeNativeMethods.NativeChunkerAPI* Native
+        {
+            get { return this._Native; }
+        }
+
+        public void Dispose()
+        {
+            if (_Native != null)
+            {
+                SafeNativeMethods.Longtail_DisposeAPI((SafeNativeMethods.NativeAPI*)_Native);
+                _Native = null;
+            }
+        }
+        internal void Detach()
+        {
+            _Native = null;
+        }
+    }
+
     public unsafe sealed class CompressionRegistryAPI : IDisposable
     {
         SafeNativeMethods.NativeCompressionRegistryAPI* _Native;
@@ -797,6 +823,7 @@ namespace LongtailLib
         public unsafe static VersionIndex CreateVersionIndex(
             StorageAPI storageAPI,
             HashAPI hashAPI,
+            ChunkerAPI chunkerAPI,
             JobAPI jobAPI,
             ProgressFunc progress,
             CancellationToken cancellationToken,
@@ -807,6 +834,7 @@ namespace LongtailLib
         {
             if (storageAPI == null) { throw new ArgumentException("CreateVersionIndex storageAPI is null"); }
             if (hashAPI == null) { throw new ArgumentException("CreateVersionIndex hashAPI is null"); }
+            if (chunkerAPI == null) { throw new ArgumentException("CreateVersionIndex chunkerAPI is null"); }
             if (jobAPI == null) { throw new ArgumentException("CreateVersionIndex jobAPI is null"); }
             if (fileInfos == null) { throw new ArgumentException("CreateVersionIndex fileInfos is null"); }
 
@@ -815,6 +843,7 @@ namespace LongtailLib
 
             var cStorageAPI = storageAPI.Native;
             var cHashAPI = hashAPI.Native;
+            var cChunkerAPI = chunkerAPI.Native;
             var cJobAPI = jobAPI.Native;
             var cProgressHandle = progressHandle.Native;
             var cCancelHandle = cancelHandle.Native;
@@ -824,6 +853,7 @@ namespace LongtailLib
             int err = SafeNativeMethods.Longtail_CreateVersionIndex(
                 cStorageAPI,
                 cHashAPI,
+                cChunkerAPI,
                 cJobAPI,
                 cProgressHandle,
                 cCancelHandle,
@@ -1251,6 +1281,10 @@ namespace LongtailLib
         public unsafe static JobAPI CreateBikeshedJobAPI(UInt32 workerCount, int workerPriority)
         {
             return new JobAPI(SafeNativeMethods.Longtail_CreateBikeshedJobAPI(workerCount, workerPriority));
+        }
+        public unsafe static ChunkerAPI CreateHPCDCChunkerAPI()
+        {
+            return new ChunkerAPI(SafeNativeMethods.Longtail_CreateHPCDCChunkerAPI());
         }
         public unsafe static HashRegistryAPI CreateFullHashRegistry()
         {
@@ -2368,6 +2402,7 @@ namespace LongtailLib
         internal unsafe struct NativeStorageAPI { }
         internal unsafe struct NativeHashAPI { }
         internal unsafe struct NativeJobAPI { }
+        internal unsafe struct NativeChunkerAPI { }
         internal unsafe struct NativeHashRegistryAPI { }
         internal unsafe struct NativeCompressionRegistryAPI { }
         internal unsafe struct NativeCancelAPI { }
@@ -2574,6 +2609,7 @@ namespace LongtailLib
         internal unsafe static extern int Longtail_CreateVersionIndex(
             NativeStorageAPI* storage_api,
             NativeHashAPI* hash_api,
+            NativeChunkerAPI* chunker_api,
             NativeJobAPI* job_api,
             NativeProgressAPI* progress_api,
             NativeCancelAPI* cancel_api,
@@ -2644,7 +2680,6 @@ namespace LongtailLib
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern int Longtail_MergeContentIndex(NativeJobAPI* job_api, NativeContentIndex* local_content_index, NativeContentIndex* new_content_index, ref NativeContentIndex* out_content_index);
 
-
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern UInt32 Longtail_ContentIndex_GetHashAPI(NativeContentIndex* content_index);
 
@@ -2710,6 +2745,9 @@ namespace LongtailLib
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern NativeJobAPI* Longtail_CreateBikeshedJobAPI(UInt32 worker_count, int worker_priority);
+
+        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
+        internal unsafe static extern NativeChunkerAPI* Longtail_CreateHPCDCChunkerAPI();
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern UInt32 Longtail_Job_GetWorkerCount(NativeJobAPI* job_api);

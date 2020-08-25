@@ -16,6 +16,7 @@ namespace LongtailLib
         {
             uint workerCount = (uint)Environment.ProcessorCount;
             using (var jobAPI = API.CreateBikeshedJobAPI(workerCount, -1))
+            using (var chunkerAPI = API.CreateHPCDCChunkerAPI())
             using (var hashRegistry = API.CreateFullHashRegistry())
             {
                 UInt32 hashIdentifier = targetVersionIndex.HashIdentifier;
@@ -33,6 +34,7 @@ namespace LongtailLib
                     installPath,
                     installFilter,
                     jobAPI,
+                    chunkerAPI,
                     hashAPI,
                     targetChunkSize,
                     progress,
@@ -93,6 +95,7 @@ namespace LongtailLib
             string installPathInLocalStorageAPI,
             PathFilterFunc installFolderFilter,
             JobAPI jobAPI,
+            ChunkerAPI chunkerAPI,
             HashAPI hashAPI,
             UInt32 targetChunkSize,
             ProgressFunc indexProgress,
@@ -109,6 +112,7 @@ namespace LongtailLib
                     VersionIndex currentVersionIndex = API.CreateVersionIndex(
                         localStorageAPI,
                         hashAPI,
+                        chunkerAPI,
                         jobAPI,
                         indexProgress,
                         cancellationToken,
