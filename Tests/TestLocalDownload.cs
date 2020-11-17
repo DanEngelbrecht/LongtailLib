@@ -7,6 +7,7 @@ using System.IO.Abstractions;
 using System.Threading;
 using LongtailLib;
 using System.IO.Abstractions.TestingHelpers;
+using System.Text;
 
 namespace Tests
 {
@@ -96,9 +97,11 @@ namespace Tests
         }
     }
 
+
     [TestClass]
     public class UnitTestLocalDownload
     {
+        static string[] LogLevel = { "DEBUG", "INFO", "WARNING", "ERROR" };
         [TestMethod]
         public async Task TestDownsyncTotalCmd()
         {
@@ -134,7 +137,16 @@ namespace Tests
             LogHandle logHandle = new LogHandle(
                 (LogContext logContext, string message) =>
                 {
-                    Debug.WriteLine(logContext.Level.ToString() + ": " + message);
+                    var db = new StringBuilder();
+                    db.Append($"{logContext.File}({logContext.Line}) {logContext.Function}() {LogLevel[logContext.Level]}");
+                    db.Append(" {");
+                    for (int f = 0; f < logContext.FieldCount; ++f)
+                    {
+                        db.Append($" {logContext.FieldName(f)} : {logContext.FieldValue(f)}");
+                    }
+                    db.Append("} ");
+                    db.Append($": {message}");
+                    Debug.WriteLine(db.ToString());
                 });
             API.SetLogLevel(API.LOG_LEVEL_WARNING);
             CancellationToken cancellationToken = new CancellationToken();

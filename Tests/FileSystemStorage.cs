@@ -401,12 +401,14 @@ namespace LongtailLib
 
         void IStorage.LockFile(string path, ref IntPtr outLockFile)
         {
-            throw new NotImplementedException();
+            // We don't expect multiple processes to run from the same cache so we do nothing here...
+            // throw new NotImplementedException();
         }
 
         void IStorage.UnlockFile(IntPtr lockFile)
         {
-            throw new NotImplementedException();
+            // We don't expect multiple processes to run from the same cache so we do nothing here...
+            // throw new NotImplementedException();
         }
 
         IFileSystem m_FileSystem;

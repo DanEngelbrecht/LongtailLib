@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -433,12 +434,6 @@ namespace LongtailLib
         }
     }
 
-    public class LogField
-    {
-        public string m_Name;
-        public string m_Value;
-    }
-
     public unsafe sealed class LogContext : IDisposable
     {
         SafeNativeMethods.NativeLogContext* _Native;
@@ -472,10 +467,6 @@ namespace LongtailLib
         {
             get { return _Native->GetFunction(); }
         }
-        public unsafe LogField[] LogFields
-        {
-            get { return _Native->GetLogFields(); }
-        }
         public unsafe Int32 Line
         {
             get { return _Native->GetLine(); }
@@ -483,6 +474,18 @@ namespace LongtailLib
         public unsafe Int32 Level
         {
             get { return _Native->GetLevel(); }
+        }
+        public unsafe Int32 FieldCount
+        {
+            get { return _Native->GetFieldCount(); }
+        }
+        public unsafe string FieldName(int fieldIndex)
+        {
+            return _Native->GetFieldName(fieldIndex);
+        }
+        public unsafe string FieldValue(int fieldIndex)
+        {
+            return _Native->GetFieldValue(fieldIndex);
         }
     }
 
@@ -1680,12 +1683,15 @@ namespace LongtailLib
                         };
 
                 m_BlockStorePreflightGet =
-                        (SafeNativeMethods.NativeBlockStoreAPI* block_store_api, UInt64 chunkCount, UInt64[] chunkHashes) =>
+                        (SafeNativeMethods.NativeBlockStoreAPI* block_store_api, UInt64 chunkCount, UInt64* chunkHashes) =>
                         {
                             try
                             {
                                 var hashes = new UInt64[chunkCount];
-                                Array.Copy(chunkHashes, hashes, (int)chunkCount);
+                                for (UInt64 i = 0; i < chunkCount; i++)
+                                {
+                                    hashes[i] = chunkHashes[i];
+                                }
                                 m_BlockStore.PreflightGet(hashes);
                                 return 0;
                             }
@@ -2489,7 +2495,7 @@ namespace LongtailLib
         public unsafe delegate int BlockStore_PutStoredBlockCallback(NativeBlockStoreAPI* block_store_api, NativeStoredBlock* stored_block, NativeAsyncPutStoredBlockAPI* async_complete_api);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        public unsafe delegate int BlockStore_PreflightGetCallback(SafeNativeMethods.NativeBlockStoreAPI* block_store_api, UInt64 chunkCount, UInt64[] chunkHashes);
+        public unsafe delegate int BlockStore_PreflightGetCallback(SafeNativeMethods.NativeBlockStoreAPI* block_store_api, UInt64 chunkCount, UInt64* chunkHashes);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public unsafe delegate int BlockStore_GetStoredBlockCallback(NativeBlockStoreAPI* block_store_api, UInt64 block_hash, NativeAsyncGetStoredBlockAPI* async_complete_api);
@@ -2701,31 +2707,33 @@ namespace LongtailLib
             }
         }
 
-        [StructLayout(LayoutKind.Sequential)]
+        static internal unsafe string CStrToString(char* cStr)
+        {
+            var p = (sbyte*)cStr;
+            int len = 0;
+            while (p[len] != 0)
+            {
+                ++len;
+            }
+            return new string((sbyte*)cStr, 0, len, Encoding.ASCII);
+        }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
         internal unsafe struct NativeLogContext
         {
             void* m_Context;
             char* m_File;
             char* m_Function;
-            void* m_Fields;
+            char** m_Fields;
             Int32 m_FieldCount;
             Int32 m_Line;
             Int32 m_Level;
 
-            public unsafe string GetFile() { return new string(m_File); }
-            public unsafe string GetFunction() { return new string(m_Function); }
-            public unsafe LogField[] GetLogFields() {
-                char** logFields = (char**)m_Fields;
-                var fields = new LogField[m_FieldCount];
-                for (Int32 f = 0; f < m_FieldCount; ++f)
-                {
-                    var fieldName = new string(logFields[f * 2]);
-                    var fieldValue = new string(logFields[f * 2]);
-                    fields[f].m_Name = fieldName;
-                    fields[f].m_Value = fieldValue;
-                }
-                return fields;
-            }
+            public unsafe string GetFile() { return CStrToString(m_File);}
+            public unsafe string GetFunction() { return CStrToString(m_Function); }
+            public unsafe int GetFieldCount() { return (int)m_FieldCount; }
+            public unsafe string GetFieldName(int fieldIndex) { return CStrToString(m_Fields[fieldIndex * 2 + 0]); }
+            public unsafe string GetFieldValue(int fieldIndex) { return CStrToString(m_Fields[fieldIndex * 2 + 1]); }
             public unsafe Int32 GetLine() { return m_Line; }
             public unsafe Int32 GetLevel() { return m_Level; }
         }
@@ -3086,7 +3094,7 @@ namespace LongtailLib
             [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_PutStoredBlockCallback put_stored_block_func,
             [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_PreflightGetCallback preflight_get_func,
             [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_GetStoredBlockCallback get_stored_block_func,
-            [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_GetExistingContentCallback retarget_content_func,
+            [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_GetExistingContentCallback get_existing_content_func,
             [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_GetStatsCallback get_stats_func,
             [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_FlushCallback flush_func);
 
