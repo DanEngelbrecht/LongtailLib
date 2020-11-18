@@ -66,10 +66,9 @@ namespace LongtailLib
             using (var blockStore = API.CreateShareBlockStoreAPI(compressionBlockStore))
             using (var hashAPI = API.GetHashAPI(hashRegistry, targetVersionIndex.HashIdentifier))
             using (var versionDiff = API.CreateVersionDiff(hashAPI, currentVersionIndex, targetVersionIndex))
-            using (var versionContentIndex = API.CreateContentIndexFromDiff(hashAPI, targetVersionIndex, versionDiff, 8388608, 1024))
             {
-
-                using (var remoteContentIndex = await LongtailLib.API.RetargetContentIndex(blockStore, versionContentIndex))
+                var requiredChunkHashes = LongtailLib.API.GetRequiredChunkHashes(targetVersionIndex, versionDiff);
+                using (var remoteContentIndex = await LongtailLib.API.GetExistingContentIndex(blockStore, requiredChunkHashes, 0))
                 {
                     await ChangeVersion(
                         blockStore,

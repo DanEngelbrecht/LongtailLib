@@ -2,19 +2,20 @@
 using System.Collections.Concurrent;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace LongtailLib
 {
     public delegate void AssertFunc(string expression, string file, int line);
-    public delegate void LogFunc(int level, string message);
+    public delegate void LogFunc(LogContext logContext, string message);
     public delegate bool PathFilterFunc(string rootPath, string assetPath, string assetName, bool isDir, ulong size, uint permissions);
     public delegate void ProgressFunc(UInt32 totalCount, UInt32 doneCount);
 
     public delegate void OnPutBlockComplete(Exception e);
     public delegate void OnGetBlockComplete(StoredBlock storedBlock, Exception e);
-    public delegate void OnRetargetContentComplete(ContentIndex contentIndex, Exception e);
+    public delegate void OnGetExistingContentComplete(ContentIndex contentIndex, Exception e);
     public delegate void OnFlushComplete(Exception e);
 
     public enum StatU64 : UInt32 {
@@ -30,9 +31,9 @@ namespace LongtailLib
         PutStoredBlock_Chunk_Count = 8,
         PutStoredBlock_Byte_Count = 9,
 
-        RetargetContent_Count = 10,
-        RetargetContent_RetryCount = 11,
-        RetargetContent_FailCount = 12,
+        GetExistingContent_Count = 10,
+        GetExistingContent_RetryCount = 11,
+        GetExistingContent_FailCount = 12,
 
         PreflightGet_Count = 13,
         PreflightGet_RetryCount = 14,
@@ -65,9 +66,9 @@ namespace LongtailLib
     public interface IBlockStore
     {
         void PutStoredBlock(StoredBlock storedBlock, OnPutBlockComplete completeCallback);
-        void PreflightGet(ContentIndex contentIndex);
+        void PreflightGet(UInt64[] chunkHashes);
         void GetStoredBlock(UInt64 blockHash, OnGetBlockComplete completeCallback);
-        void RetargetContent(ContentIndex contentIndex, OnRetargetContentComplete completeCallback);
+        void GetExistingContent(UInt64[] chunkHashes, UInt32 minBlockUsagePercent, OnGetExistingContentComplete completeCallback);
         BlockStoreStats GetStats();
         void Flush(OnFlushComplete completeCallback);
     }
@@ -339,6 +340,14 @@ namespace LongtailLib
         {
             get { return _Native->GetTargetChunkSize(); }
         }
+        public unsafe UInt32 ChunkCount
+        {
+            get { return _Native->GetChunkCount(); }
+        }
+        public unsafe UInt64[] ChunkHashes
+        {
+            get { return _Native->GetChunkHashes(); }
+        }
     }
 
     public unsafe sealed class ContentIndex : IDisposable
@@ -382,6 +391,101 @@ namespace LongtailLib
         public unsafe UInt64[] BlockHashes
         {
             get { return _Native->GetBlockHashes(); }
+        }
+    }
+
+    public unsafe sealed class StoreIndex : IDisposable
+    {
+        SafeNativeMethods.NativeStoreIndex* _Native;
+        internal StoreIndex(SafeNativeMethods.NativeStoreIndex* NativeStoreIndex)
+        {
+            _Native = NativeStoreIndex;
+        }
+        internal SafeNativeMethods.NativeStoreIndex* Native
+        {
+            get { return this._Native; }
+        }
+
+        public void Dispose()
+        {
+            if (_Native != null)
+            {
+                API.Free(_Native);
+                _Native = null;
+            }
+        }
+
+        internal void Detach()
+        {
+            _Native = null;
+        }
+
+        public unsafe UInt32 HashIdentifier
+        {
+            get { return _Native->GetHashIdentifier(); }
+        }
+        public unsafe UInt64[] BlockHashes
+        {
+            get { return _Native->GetBlockHashes(); }
+        }
+        public unsafe UInt64[] CunkHashes
+        {
+            get { return _Native->GetChunkHashes(); }
+        }
+    }
+
+    public unsafe sealed class LogContext : IDisposable
+    {
+        SafeNativeMethods.NativeLogContext* _Native;
+        internal LogContext(SafeNativeMethods.NativeLogContext* NativeLogContext)
+        {
+            _Native = NativeLogContext;
+        }
+        internal SafeNativeMethods.NativeLogContext* Native
+        {
+            get { return this._Native; }
+        }
+
+        public void Dispose()
+        {
+            if (_Native != null)
+            {
+                API.Free(_Native);
+                _Native = null;
+            }
+        }
+
+        internal void Detach()
+        {
+            _Native = null;
+        }
+
+        public unsafe string File {
+            get { return _Native->GetFile(); }
+        }
+        public unsafe string Function
+        {
+            get { return _Native->GetFunction(); }
+        }
+        public unsafe Int32 Line
+        {
+            get { return _Native->GetLine(); }
+        }
+        public unsafe Int32 Level
+        {
+            get { return _Native->GetLevel(); }
+        }
+        public unsafe Int32 FieldCount
+        {
+            get { return _Native->GetFieldCount(); }
+        }
+        public unsafe string FieldName(int fieldIndex)
+        {
+            return _Native->GetFieldName(fieldIndex);
+        }
+        public unsafe string FieldValue(int fieldIndex)
+        {
+            return _Native->GetFieldValue(fieldIndex);
         }
     }
 
@@ -445,11 +549,12 @@ namespace LongtailLib
         {
             m_LogFunc = logFunc;
             m_LogCallback =
-                (void* context, int level, string str) =>
+                (SafeNativeMethods.NativeLogContext* log_context, string str) =>
                 {
                     try
                     {
-                        m_LogFunc(level, str);
+                        var logContext = new LogContext(log_context);
+                        m_LogFunc(logContext, str);
                     }
                     catch (Exception)
                     {
@@ -739,11 +844,11 @@ namespace LongtailLib
             SafeNativeMethods.NativeAsyncFlushAPI* _Native;
         };
 
-        private unsafe sealed class WrappedAsyncRetargetContentAPI : IDisposable
+        private unsafe sealed class WrappedAsyncGetExistingContentAPI : IDisposable
         {
-            public WrappedAsyncRetargetContentAPI()
+            public WrappedAsyncGetExistingContentAPI()
             {
-                UInt64 mem_size = SafeNativeMethods.Longtail_GetAsyncRetargetContentAPISize();
+                UInt64 mem_size = SafeNativeMethods.Longtail_GetAsyncGetExistingContentAPISize();
                 byte* mem = (byte*)API.Alloc(mem_size);
                 if (mem == null)
                 {
@@ -756,7 +861,7 @@ namespace LongtailLib
                             _Native = null;
                         };
                 m_ASyncCallback =
-                    (SafeNativeMethods.NativeAsyncRetargetContentAPI* async_complete_api, SafeNativeMethods.NativeContentIndex* content_index, int err) =>
+                    (SafeNativeMethods.NativeAsyncGetExistingContentAPI* async_complete_api, SafeNativeMethods.NativeContentIndex* content_index, int err) =>
                     {
                         this.err = err;
                         if (err == 0)
@@ -766,7 +871,7 @@ namespace LongtailLib
                         m_EventHandle.Set();
                         return 0;
                     };
-                _Native = SafeNativeMethods.Longtail_MakeAsyncRetargetContentAPI(mem, m_Dispose, m_ASyncCallback);
+                _Native = SafeNativeMethods.Longtail_MakeAsyncGetExistingContentAPI(mem, m_Dispose, m_ASyncCallback);
                 m_EventHandle = new EventWaitHandle(false, EventResetMode.AutoReset);
                 m_ContentIndex = null;
             }
@@ -778,7 +883,7 @@ namespace LongtailLib
                     _Native = null;
                 }
             }
-            internal SafeNativeMethods.NativeAsyncRetargetContentAPI* Native
+            internal SafeNativeMethods.NativeAsyncGetExistingContentAPI* Native
             {
                 get { return this._Native; }
             }
@@ -792,11 +897,11 @@ namespace LongtailLib
             }
 
             SafeNativeMethods.Longtail_DisposeFunc m_Dispose;
-            SafeNativeMethods.ASyncRetargetContentCompleteCallback m_ASyncCallback;
+            SafeNativeMethods.ASyncGetExistingContentCompleteCallback m_ASyncCallback;
             EventWaitHandle m_EventHandle;
             ContentIndex m_ContentIndex;
             int err = -1;
-            SafeNativeMethods.NativeAsyncRetargetContentAPI* _Native;
+            SafeNativeMethods.NativeAsyncGetExistingContentAPI* _Native;
         };
 
         public unsafe static Task BlockStoreFlush(BlockStoreAPI blockStoreAPI)
@@ -940,6 +1045,40 @@ namespace LongtailLib
             ThrowExceptionFromErrno("ReadContentIndex", path, err);
             return null;
         }
+        public unsafe static StoreIndex ReadStoreIndexFromBuffer(byte[] buffer)
+        {
+            if (buffer == null) { throw new ArgumentException("ReadStoreIndexFromBuffer buffer is null"); }
+
+            SafeNativeMethods.NativeStoreIndex* nativeStoreIndex = null;
+            GCHandle pinnedArray = GCHandle.Alloc(buffer, GCHandleType.Pinned);
+            IntPtr bufferPtr = pinnedArray.AddrOfPinnedObject();
+            int err = SafeNativeMethods.Longtail_ReadStoreIndexFromBuffer((void*)bufferPtr, (UInt64)buffer.Length, ref nativeStoreIndex);
+            pinnedArray.Free();
+            if (err == 0)
+            {
+                return new StoreIndex(nativeStoreIndex);
+            }
+            ThrowExceptionFromErrno("ReadStoreIndexFromBuffer", "", err);
+            return null;
+        }
+        public unsafe static StoreIndex ReadStoreIndex(StorageAPI storageAPI, string path)
+        {
+            if (storageAPI == null) { throw new ArgumentException("ReadStoreIndex storageAPI is null"); }
+            if (path == null) { throw new ArgumentException("ReadStoreIndex path is null"); }
+
+            var cStorageAPI = storageAPI.Native;
+            SafeNativeMethods.NativeStoreIndex* nativeStoreIndex = null;
+            int err = SafeNativeMethods.Longtail_ReadStoreIndex(
+                cStorageAPI,
+                path,
+                ref nativeStoreIndex);
+            if (err == 0)
+            {
+                return new StoreIndex(nativeStoreIndex);
+            }
+            ThrowExceptionFromErrno("ReadStoreIndex", path, err);
+            return null;
+        }
         public unsafe static ContentIndex CreateMissingContent(HashAPI hashAPI, ContentIndex contentIndex, VersionIndex version, UInt32 maxBlockSize, UInt32 maxChunksPerBlock)
         {
             if (hashAPI == null) { throw new ArgumentException("CreateMissingContent hashAPI is null"); }
@@ -1017,105 +1156,139 @@ namespace LongtailLib
             return null;
         }
 
-        public unsafe static ContentIndex CreateContentIndexFromDiff(
-            HashAPI hashAPI,
+        public unsafe static UInt64[] GetRequiredChunkHashes(
             VersionIndex versionIndex,
-            VersionDiff versionDiff,
+            VersionDiff versionDiff)
+        {
+            if (versionIndex == null) { throw new ArgumentException("CreateContentIndexFromDiff versionIndex is null"); }
+            if (versionDiff == null) { throw new ArgumentException("CreateContentIndexFromDiff versionDiff is null"); }
+
+            var cVersionIndex = versionIndex.Native;
+            var cVersionDiff = versionDiff.Native;
+            UInt64 chunkCount = 0;
+            var chunkHashes = new UInt64[versionIndex.ChunkCount];
+            GCHandle pinnedArray = GCHandle.Alloc(chunkHashes, GCHandleType.Pinned);
+            IntPtr chunkHashesPtr = pinnedArray.AddrOfPinnedObject();
+            int err = SafeNativeMethods.Longtail_GetRequiredChunkHashes(
+                cVersionIndex,
+                cVersionDiff,
+                ref chunkCount,
+                (UInt64*)chunkHashesPtr);
+            pinnedArray.Free();
+            if (err == 0)
+            {
+                var result = new UInt64[chunkCount];
+                Array.Copy(chunkHashes, result, (int)chunkCount);
+                return result;
+            }
+            ThrowExceptionFromErrno("GetRequiredChunkHashes", "", err);
+            return null;
+        }
+
+        public unsafe static ContentIndex GetExistingContentIndex(
+            StoreIndex storeIndex,
+            UInt64[] chunkHashes,
+            UInt32 minBlockUsagePercent,
             UInt32 maxBlockSize,
             UInt32 maxChunksPerBlock)
         {
-            if (hashAPI == null) { throw new ArgumentException("CreateContentIndexFromDiff hashAPI is null"); }
-            if (versionIndex == null) { throw new ArgumentException("CreateContentIndexFromDiff versionIndex is null"); }
-            if (versionDiff == null) { throw new ArgumentException("CreateContentIndexFromDiff versionDiff is null"); }
-            if (maxBlockSize == 0) { throw new ArgumentException("CreateContentIndexFromDiff maxBlockSize is 0"); }
-            if (maxChunksPerBlock == 0) { throw new ArgumentException("CreateContentIndexFromDiff maxChunksPerBlock is 0"); }
+            if (storeIndex == null) { throw new ArgumentException("GetExistingContent referenceContentIndex is null"); }
+            if (maxBlockSize == 0) { throw new ArgumentException("GetExistingContent contentIndex maxBlockSize zero"); }
+            if (maxChunksPerBlock == 0) { throw new ArgumentException("GetExistingContent maxChunksPerBlock is zero"); }
 
-            var cHashAPI = hashAPI.Native;
-            var cVersionIndex = versionIndex.Native;
-            var cVersionDiff = versionDiff.Native;
+            var cStoreIndex = storeIndex.Native;
+            GCHandle pinnedArray = GCHandle.Alloc(chunkHashes, GCHandleType.Pinned);
+            IntPtr chunkHashesPtr = pinnedArray.AddrOfPinnedObject();
+
             SafeNativeMethods.NativeContentIndex* nativeContentIndex = null;
-            int err = SafeNativeMethods.Longtail_CreateContentIndexFromDiff(
-                cHashAPI,
-                cVersionIndex,
-                cVersionDiff,
+            int err = SafeNativeMethods.Longtail_GetExistingContentIndex(
+                cStoreIndex,
+                (UInt32)chunkHashes.Length,
+                (UInt64*)chunkHashesPtr,
+                minBlockUsagePercent,
                 maxBlockSize,
                 maxChunksPerBlock,
                 ref nativeContentIndex);
+            pinnedArray.Free();
             if (err == 0)
             {
                 return new ContentIndex(nativeContentIndex);
             }
-            ThrowExceptionFromErrno("CreateContentIndexFromDiff", "", err);
+            ThrowExceptionFromErrno("GetExistingContent", "", err);
             return null;
         }
+        /*        public unsafe static ContentIndex GetExistingContent(ContentIndex referenceContentIndex, ContentIndex contentIndex)
+                {
+                    if (referenceContentIndex == null) { throw new ArgumentException("GetExistingContent referenceContentIndex is null"); }
+                    if (contentIndex == null) { throw new ArgumentException("GetExistingContent contentIndex is null"); }
 
-        public unsafe static ContentIndex RetargetContent(ContentIndex referenceContentIndex, ContentIndex contentIndex)
+                    var cReferenceContentIndex = referenceContentIndex.Native;
+                    var cContentIndex = contentIndex.Native;
+
+                    SafeNativeMethods.NativeContentIndex* nativeContentIndex = null;
+                    int err = SafeNativeMethods.Longtail_GetExistingContent(
+                        cReferenceContentIndex,
+                        cContentIndex,
+                        ref nativeContentIndex);
+                    if (err == 0)
+                    {
+                        return new ContentIndex(nativeContentIndex);
+                    }
+                    ThrowExceptionFromErrno("GetExistingContent", "", err);
+                    return null;
+                }
+                public unsafe static ContentIndex MergeContentIndex(
+                    JobAPI jobAPI,
+                    ContentIndex localContentIndex,
+                    ContentIndex newContentIndex)
+                {
+                    if (jobAPI == null) { throw new ArgumentException("MergeContentIndex jobAPI is null"); }
+                    if (localContentIndex == null) { throw new ArgumentException("MergeContentIndex localContentIndex is null"); }
+                    if (newContentIndex == null) { throw new ArgumentException("MergeContentIndex newContentIndex is null"); }
+
+                    var cLocalContentIndex = localContentIndex.Native;
+                    var cNewIndex = newContentIndex.Native;
+                    var cJobAPI = jobAPI.Native;
+
+                    SafeNativeMethods.NativeContentIndex* nativeContentIndex = null;
+                    int err = SafeNativeMethods.Longtail_MergeContentIndex(
+                        cJobAPI,
+                        cLocalContentIndex,
+                        cNewIndex,
+                        ref nativeContentIndex);
+                    if (err == 0)
+                    {
+                        return new ContentIndex(nativeContentIndex);
+                    }
+                    ThrowExceptionFromErrno("MergeContentIndex", "", err);
+                    return null;
+                }*/
+
+        public unsafe static Task<ContentIndex> GetExistingContentIndex(BlockStoreAPI blockStoreAPI, UInt64[] chunkHashes, UInt32 minBlockUsagePercent)
         {
-            if (referenceContentIndex == null) { throw new ArgumentException("RetargetContent referenceContentIndex is null"); }
-            if (contentIndex == null) { throw new ArgumentException("RetargetContent contentIndex is null"); }
-
-            var cReferenceContentIndex = referenceContentIndex.Native;
-            var cContentIndex = contentIndex.Native;
-
-            SafeNativeMethods.NativeContentIndex* nativeContentIndex = null;
-            int err = SafeNativeMethods.Longtail_RetargetContent(
-                cReferenceContentIndex,
-                cContentIndex,
-                ref nativeContentIndex);
-            if (err == 0)
-            {
-                return new ContentIndex(nativeContentIndex);
-            }
-            ThrowExceptionFromErrno("RetargetContent", "", err);
-            return null;
-        }
-        public unsafe static ContentIndex MergeContentIndex(
-            JobAPI jobAPI,
-            ContentIndex localContentIndex,
-            ContentIndex newContentIndex)
-        {
-            if (jobAPI == null) { throw new ArgumentException("MergeContentIndex jobAPI is null"); }
-            if (localContentIndex == null) { throw new ArgumentException("MergeContentIndex localContentIndex is null"); }
-            if (newContentIndex == null) { throw new ArgumentException("MergeContentIndex newContentIndex is null"); }
-
-            var cLocalContentIndex = localContentIndex.Native;
-            var cNewIndex = newContentIndex.Native;
-            var cJobAPI = jobAPI.Native;
-
-            SafeNativeMethods.NativeContentIndex* nativeContentIndex = null;
-            int err = SafeNativeMethods.Longtail_MergeContentIndex(
-                cJobAPI,
-                cLocalContentIndex,
-                cNewIndex,
-                ref nativeContentIndex);
-            if (err == 0)
-            {
-                return new ContentIndex(nativeContentIndex);
-            }
-            ThrowExceptionFromErrno("MergeContentIndex", "", err);
-            return null;
-        }
-
-        public unsafe static Task<ContentIndex> RetargetContentIndex(BlockStoreAPI blockStoreAPI, ContentIndex contentIndex)
-        {
-            if (blockStoreAPI == null) { throw new ArgumentException("RetargetContentIndex blockStoreAPI is null"); }
-            if (contentIndex == null) { throw new ArgumentException("RetargetContentIndex contentIndex is null"); }
+            if (blockStoreAPI == null) { throw new ArgumentException("GetExistingContentIndex blockStoreAPI is null"); }
             return Task<ContentIndex>.Run(() =>
             {
-                WrappedAsyncRetargetContentAPI wrappedAsyncRetargetContentAPI = new WrappedAsyncRetargetContentAPI();
-                int err = SafeNativeMethods.Longtail_BlockStore_RetargetContent(
+                GCHandle pinnedArray = GCHandle.Alloc(chunkHashes, GCHandleType.Pinned);
+                IntPtr chunkHashesPtr = pinnedArray.AddrOfPinnedObject();
+
+                WrappedAsyncGetExistingContentAPI wrappedAsyncGetExistingContentAPI = new WrappedAsyncGetExistingContentAPI();
+                int err = SafeNativeMethods.Longtail_BlockStore_GetExistingContent(
                     blockStoreAPI.Native,
-                    contentIndex.Native,
-                    wrappedAsyncRetargetContentAPI.Native);
-                ContentIndex result = wrappedAsyncRetargetContentAPI.Result;
+                    (UInt64)chunkHashes.Length,
+                    (UInt64*)chunkHashesPtr,
+                    minBlockUsagePercent,
+                    wrappedAsyncGetExistingContentAPI.Native);
+                pinnedArray.Free();
+                ContentIndex result = wrappedAsyncGetExistingContentAPI.Result;
                 if (err == 0)
                 {
-                    err = wrappedAsyncRetargetContentAPI.Err;
+                    err = wrappedAsyncGetExistingContentAPI.Err;
                 }
-                wrappedAsyncRetargetContentAPI.Dispose();
+                wrappedAsyncGetExistingContentAPI.Dispose();
                 if (err != 0)
                 {
-                    ThrowExceptionFromErrno("BlockStoreRetargetContent", "", err);
+                    ThrowExceptionFromErrno("BlockStoreGetExistingContent", "", err);
                 }
                 return result;
             });
@@ -1127,7 +1300,7 @@ namespace LongtailLib
             int err = SafeNativeMethods.Longtail_ValidateContent(contentIndex.Native, versionIndex.Native);
             if (err != 0)
             {
-                ThrowExceptionFromErrno("BlockStoreRetargetContent", "", err);
+                ThrowExceptionFromErrno("BlockStoreValidateContent", "", err);
             }
         }
         public unsafe static UInt32 ContentIndexGetHashAPI(ContentIndex contentIndex)
@@ -1510,12 +1683,16 @@ namespace LongtailLib
                         };
 
                 m_BlockStorePreflightGet =
-                        (SafeNativeMethods.NativeBlockStoreAPI* block_store_api, SafeNativeMethods.NativeContentIndex* native_content_index) =>
+                        (SafeNativeMethods.NativeBlockStoreAPI* block_store_api, UInt64 chunkCount, UInt64* chunkHashes) =>
                         {
-                            var content_index = new ContentIndex(native_content_index);
                             try
                             {
-                                m_BlockStore.PreflightGet(content_index);
+                                var hashes = new UInt64[chunkCount];
+                                for (UInt64 i = 0; i < chunkCount; i++)
+                                {
+                                    hashes[i] = chunkHashes[i];
+                                }
+                                m_BlockStore.PreflightGet(hashes);
                                 return 0;
                             }
                             catch (Exception e)
@@ -1542,25 +1719,25 @@ namespace LongtailLib
                             return 0;
                         };
 
-                m_RetargetContent =
-                        (SafeNativeMethods.NativeBlockStoreAPI* block_store_api, SafeNativeMethods.NativeContentIndex* native_content_index, SafeNativeMethods.NativeAsyncRetargetContentAPI* async_complete_api) =>
+                m_GetExistingContent =
+                        (SafeNativeMethods.NativeBlockStoreAPI* block_store_api, UInt64 chunkCount, UInt64* chunkHashes, UInt32 minBlockUsagePercent, SafeNativeMethods.NativeAsyncGetExistingContentAPI* async_complete_api) =>
                         {
-                            var content_index = new ContentIndex(native_content_index);
                             try
                             {
-                                m_BlockStore.RetargetContent(content_index, (ContentIndex contentIndex, Exception e) =>
+                                var hashes = new UInt64[chunkCount];
+                                for (UInt64 i = 0; i < chunkCount; i++)
                                 {
-                                    SafeNativeMethods.Longtail_AsyncRetargetContent_OnComplete(async_complete_api, contentIndex.Native == null ? null : contentIndex.Native, API.GetErrnoFromException(e, SafeNativeMethods.EIO));
+                                    hashes[i] = chunkHashes[i];
+                                }
+                                m_BlockStore.GetExistingContent(hashes, minBlockUsagePercent, (ContentIndex contentIndex, Exception e) =>
+                                {
+                                    SafeNativeMethods.Longtail_AsyncGetExistingContent_OnComplete(async_complete_api, contentIndex.Native == null ? null : contentIndex.Native, API.GetErrnoFromException(e, SafeNativeMethods.EIO));
                                 });
                             }
                             catch (Exception e)
                             {
                                 int errno = API.GetErrnoFromException(e, SafeNativeMethods.EIO);
-                                SafeNativeMethods.Longtail_AsyncRetargetContent_OnComplete(async_complete_api, null, errno);
-                            }
-                            finally
-                            {
-                                content_index.Detach();
+                                SafeNativeMethods.Longtail_AsyncGetExistingContent_OnComplete(async_complete_api, null, errno);
                             }
                             return 0;
                         };
@@ -1608,7 +1785,7 @@ namespace LongtailLib
                         m_BlockStorePutStoredBlock,
                         m_BlockStorePreflightGet,
                         m_BlockStoreGetStoredBlock,
-                        m_RetargetContent,
+                        m_GetExistingContent,
                         m_BlockStoreGetStats,
                         m_BlockStoreFlush));
             }
@@ -1616,7 +1793,7 @@ namespace LongtailLib
             SafeNativeMethods.BlockStore_PutStoredBlockCallback m_BlockStorePutStoredBlock;
             SafeNativeMethods.BlockStore_PreflightGetCallback m_BlockStorePreflightGet;
             SafeNativeMethods.BlockStore_GetStoredBlockCallback m_BlockStoreGetStoredBlock;
-            SafeNativeMethods.BlockStore_RetargetContentCallback m_RetargetContent;
+            SafeNativeMethods.BlockStore_GetExistingContentCallback m_GetExistingContent;
             SafeNativeMethods.BlockStore_GetStatsCallback m_BlockStoreGetStats;
             SafeNativeMethods.BlockStore_FlushCallback m_BlockStoreFlush;
 
@@ -2291,7 +2468,7 @@ namespace LongtailLib
         public delegate void AssertCallback(string expression, string file, int line);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        public unsafe delegate void LogCallback(void* context, int level, string str);
+        public unsafe delegate void LogCallback(SafeNativeMethods.NativeLogContext* context, string str);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public unsafe delegate void Longtail_DisposeFunc(NativeAPI* api);
@@ -2312,13 +2489,13 @@ namespace LongtailLib
         public unsafe delegate int ASyncFlushCompleteCallback(NativeAsyncFlushAPI* asyncCompleteAPI, int err);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        public unsafe delegate int ASyncRetargetContentCompleteCallback(NativeAsyncRetargetContentAPI* asyncCompleteAPI, NativeContentIndex* content_index, int err);
+        public unsafe delegate int ASyncGetExistingContentCompleteCallback(NativeAsyncGetExistingContentAPI* asyncCompleteAPI, NativeContentIndex* content_index, int err);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public unsafe delegate int BlockStore_PutStoredBlockCallback(NativeBlockStoreAPI* block_store_api, NativeStoredBlock* stored_block, NativeAsyncPutStoredBlockAPI* async_complete_api);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        public unsafe delegate int BlockStore_PreflightGetCallback(SafeNativeMethods.NativeBlockStoreAPI* block_store_api, NativeContentIndex* content_index);
+        public unsafe delegate int BlockStore_PreflightGetCallback(SafeNativeMethods.NativeBlockStoreAPI* block_store_api, UInt64 chunkCount, UInt64* chunkHashes);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public unsafe delegate int BlockStore_GetStoredBlockCallback(NativeBlockStoreAPI* block_store_api, UInt64 block_hash, NativeAsyncGetStoredBlockAPI* async_complete_api);
@@ -2327,7 +2504,7 @@ namespace LongtailLib
         public unsafe delegate int BlockStore_FlushCallback(NativeBlockStoreAPI* block_store_api, NativeAsyncFlushAPI* async_complete_api);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        public unsafe delegate int BlockStore_RetargetContentCallback(NativeBlockStoreAPI* block_store_api, NativeContentIndex* content_index, NativeAsyncRetargetContentAPI* async_complete_api);
+        public unsafe delegate int BlockStore_GetExistingContentCallback(NativeBlockStoreAPI* block_store_api, UInt64 chunkCount, UInt64* chunkHashes, UInt32 minBlockUsagePercent, NativeAsyncGetExistingContentAPI* async_complete_api);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public unsafe delegate int BlockStore_GetStatsCallback(NativeBlockStoreAPI* block_store_api, ref NativeBlockStoreStats out_stats);
@@ -2396,7 +2573,7 @@ namespace LongtailLib
         internal unsafe struct NativeAsyncPutStoredBlockAPI { }
         internal unsafe struct NativeAsyncGetStoredBlockAPI { }
         internal unsafe struct NativeAsyncFlushAPI { }
-        internal unsafe struct NativeAsyncRetargetContentAPI { }
+        internal unsafe struct NativeAsyncGetExistingContentAPI { }
 
         internal unsafe struct NativeBlockStoreAPI { }
         internal unsafe struct NativeStorageAPI { }
@@ -2406,6 +2583,71 @@ namespace LongtailLib
         internal unsafe struct NativeHashRegistryAPI { }
         internal unsafe struct NativeCompressionRegistryAPI { }
         internal unsafe struct NativeCancelAPI { }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal unsafe struct NativeContentIndex
+        {
+            UInt32* m_Version;
+            UInt32* m_HashIdentifier;
+            UInt32* m_MaxBlockSize;
+            UInt32* m_MaxChunksPerBlock;
+            UInt64* m_BlockCount;
+            UInt64* m_ChunkCount;
+            UInt64* m_BlockHashes;
+            UInt64* m_ChunkHashes;
+            UInt64* m_ChunkBlockIndexes;
+
+            public unsafe UInt32 GetHashIdentifier() { return *m_HashIdentifier; }
+            public unsafe UInt32 GetMaxBlockSize() { return *m_MaxBlockSize; }
+            public unsafe UInt32 GetMaxChunksPerBlock() { return *m_MaxChunksPerBlock; }
+            public unsafe UInt64[] GetBlockHashes()
+            {
+                UInt64 blockCount = *m_BlockCount;
+                var blockHashes = new UInt64[blockCount];
+                for (UInt32 b = 0; b < blockCount; b++)
+                {
+                    blockHashes[b] = m_BlockHashes[b];
+                }
+                return blockHashes;
+            }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal unsafe struct NativeStoreIndex
+        {
+            UInt32* m_Version;
+            UInt32* m_HashIdentifier;
+            UInt32* m_BlockCount;
+            UInt32* m_ChunkCount;
+            UInt64* m_BlockHashes;
+            UInt64* m_ChunkHashes;
+            UInt32* m_BlockChunksOffsets;
+            UInt32* m_BlockChunkCounts;
+            UInt32* m_BlockTags;
+            UInt32* m_ChunkSizes;
+
+            public unsafe UInt32 GetHashIdentifier() { return *m_HashIdentifier; }
+            public unsafe UInt64[] GetBlockHashes()
+            {
+                UInt32 blockCount = *m_BlockCount;
+                var blockHashes = new UInt64[blockCount];
+                for (UInt32 b = 0; b < blockCount; b++)
+                {
+                    blockHashes[b] = m_BlockHashes[b];
+                }
+                return blockHashes;
+            }
+            public unsafe UInt64[] GetChunkHashes()
+            {
+                UInt32 chunkCount = *m_ChunkCount;
+                var chunkHashes = new UInt64[chunkCount];
+                for (UInt32 b = 0; b < chunkCount; b++)
+                {
+                    chunkHashes[b] = m_ChunkHashes[b];
+                }
+                return chunkHashes;
+            }
+        }
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
         internal unsafe struct NativeStorageAPIProperties
@@ -2452,39 +2694,51 @@ namespace LongtailLib
 
             public unsafe UInt32 GetHashIdentifier() { return *m_HashIdentifier; }
             public unsafe UInt32 GetTargetChunkSize() { return *m_TargetChunkSize; }
+            public unsafe UInt32 GetChunkCount() { return *m_ChunkCount; }
+            public unsafe UInt64[] GetChunkHashes()
+            {
+                UInt32 chunkCount = *m_ChunkCount;
+                var chunkHashes = new UInt64[chunkCount];
+                for (UInt32 b = 0; b < chunkCount; b++)
+                {
+                    chunkHashes[b] = m_ChunkHashes[b];
+                }
+                return chunkHashes;
+            }
+        }
+
+        static internal unsafe string CStrToString(char* cStr)
+        {
+            var p = (sbyte*)cStr;
+            int len = 0;
+            while (p[len] != 0)
+            {
+                ++len;
+            }
+            return new string((sbyte*)cStr, 0, len, Encoding.ASCII);
+        }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+        internal unsafe struct NativeLogContext
+        {
+            void* m_Context;
+            char* m_File;
+            char* m_Function;
+            char** m_Fields;
+            Int32 m_FieldCount;
+            Int32 m_Line;
+            Int32 m_Level;
+
+            public unsafe string GetFile() { return CStrToString(m_File);}
+            public unsafe string GetFunction() { return CStrToString(m_Function); }
+            public unsafe int GetFieldCount() { return (int)m_FieldCount; }
+            public unsafe string GetFieldName(int fieldIndex) { return CStrToString(m_Fields[fieldIndex * 2 + 0]); }
+            public unsafe string GetFieldValue(int fieldIndex) { return CStrToString(m_Fields[fieldIndex * 2 + 1]); }
+            public unsafe Int32 GetLine() { return m_Line; }
+            public unsafe Int32 GetLevel() { return m_Level; }
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        internal unsafe struct NativeContentIndex
-        {
-            UInt32* m_Version;
-            UInt32* m_HashIdentifier;
-            UInt32* m_MaxBlockSize;
-            UInt32* m_MaxChunksPerBlock;
-            UInt64* m_BlockCount;
-            UInt64* m_ChunkCount;
-            UInt64* m_BlockHashes;
-            UInt64* m_ChunkHashes;
-            UInt64* m_ChunkBlockIndexes;
-
-            public unsafe UInt32 GetHashIdentifier() { return *m_HashIdentifier; }
-            public unsafe UInt32 GetMaxBlockSize() { return *m_MaxBlockSize; }
-            public unsafe UInt32 GetMaxChunksPerBlock() { return *m_MaxChunksPerBlock; }
-            public unsafe UInt64[] GetBlockHashes()
-            {
-                UInt64 blockCount = *m_BlockCount;
-                var blockHashes = new UInt64[blockCount];
-                for (UInt32 b = 0; b < blockCount; b++)
-                {
-                    blockHashes[b] = m_BlockHashes[b];
-                }
-                return blockHashes;
-            }
-
-
-        }
-
-    [StructLayout(LayoutKind.Sequential)]
         internal unsafe struct NativeVersionDiff
         {
             UInt32* m_SourceRemovedCount;
@@ -2564,16 +2818,16 @@ namespace LongtailLib
         internal unsafe static extern void Longtail_AsyncGetStoredBlock_OnComplete(NativeAsyncGetStoredBlockAPI* aSyncCompleteAPI, NativeStoredBlock* storedBlock, int res);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern UInt64 Longtail_GetAsyncRetargetContentAPISize();
+        internal static extern UInt64 Longtail_GetAsyncGetExistingContentAPISize();
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
-        internal unsafe static extern NativeAsyncRetargetContentAPI* Longtail_MakeAsyncRetargetContentAPI(
+        internal unsafe static extern NativeAsyncGetExistingContentAPI* Longtail_MakeAsyncGetExistingContentAPI(
             void* mem,
             [MarshalAs(UnmanagedType.FunctionPtr)] Longtail_DisposeFunc disposeFunc,
-            [MarshalAs(UnmanagedType.FunctionPtr)] ASyncRetargetContentCompleteCallback asyncComplete_callback);
+            [MarshalAs(UnmanagedType.FunctionPtr)] ASyncGetExistingContentCompleteCallback asyncComplete_callback);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
-        internal unsafe static extern void Longtail_AsyncRetargetContent_OnComplete(NativeAsyncRetargetContentAPI* aSyncCompleteAPI, NativeContentIndex* contentIndex, int res);
+        internal unsafe static extern void Longtail_AsyncGetExistingContent_OnComplete(NativeAsyncGetExistingContentAPI* aSyncCompleteAPI, NativeContentIndex* contentIndex, int res);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern UInt64 Longtail_GetAsyncFlushAPISize();
@@ -2642,6 +2896,18 @@ namespace LongtailLib
             ref NativeContentIndex* out_content_index);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
+        internal unsafe static extern int Longtail_ReadStoreIndexFromBuffer(
+            void* buffer,
+            UInt64 size,
+            ref NativeStoreIndex* out_store_index);
+
+        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        internal unsafe static extern int Longtail_ReadStoreIndex(
+            NativeStorageAPI* storage_api,
+            [MarshalAs(UnmanagedType.LPStr)] string path,
+            ref NativeStoreIndex* out_store_index);
+
+        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern int Longtail_CreateMissingContent(
             NativeHashAPI* hash_api,
             NativeContentIndex* content_index,
@@ -2666,16 +2932,19 @@ namespace LongtailLib
             ref NativeContentIndex* out_content_index);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
-        internal unsafe static extern int Longtail_CreateContentIndexFromDiff(
-            NativeHashAPI* hash_api,
-            NativeVersionIndex* version_index,
-            NativeVersionDiff* version_diff,
-            UInt32 maxBlockSize,
-            UInt32 maxChunksPerBlock,
-            ref NativeContentIndex* out_content_index);
+        internal unsafe static extern int Longtail_GetExistingContentIndex(NativeStoreIndex* store_index, UInt32 chunk_count, UInt64* chunk_hashes, UInt32 minBlockUsagePercent, UInt32 minBlockSize, UInt32 maxChunksPerBlock, ref NativeContentIndex* out_content_index);
 
-        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
-        internal unsafe static extern int Longtail_RetargetContent(NativeContentIndex* reference_content_index, NativeContentIndex* content_index, ref NativeContentIndex* out_content_index);
+/*        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
+                internal unsafe static extern int Longtail_CreateContentIndexFromDiff(
+                    NativeHashAPI* hash_api,
+                    NativeVersionIndex* version_index,
+                    NativeVersionDiff* version_diff,
+                    UInt32 maxBlockSize,
+                    UInt32 maxChunksPerBlock,
+                    ref NativeContentIndex* out_content_index);*/
+
+        //        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
+        //        internal unsafe static extern int Longtail_GetExistingContent(NativeContentIndex* reference_content_index, NativeContentIndex* content_index, ref NativeContentIndex* out_content_index);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern int Longtail_MergeContentIndex(NativeJobAPI* job_api, NativeContentIndex* local_content_index, NativeContentIndex* new_content_index, ref NativeContentIndex* out_content_index);
@@ -2715,6 +2984,12 @@ namespace LongtailLib
             [MarshalAs(UnmanagedType.LPStr)] string version_path,
             int retain_permissions);
 
+        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
+        internal unsafe static extern int Longtail_GetRequiredChunkHashes(
+            NativeVersionIndex* version_index,
+            NativeVersionDiff* version_diff,
+            ref UInt64 chunk_count,
+            UInt64* out_chunk_hashes);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern NativeStorageAPI* Longtail_CreateFSStorageAPI();
@@ -2786,7 +3061,7 @@ namespace LongtailLib
         internal unsafe static extern int Longtail_BlockStore_Flush(NativeBlockStoreAPI* block_store_api, NativeAsyncFlushAPI* async_complete_api);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
-        internal unsafe static extern int Longtail_BlockStore_RetargetContent(NativeBlockStoreAPI* block_store_api, NativeContentIndex* content_index, NativeAsyncRetargetContentAPI* async_complete_api);
+        internal unsafe static extern int Longtail_BlockStore_GetExistingContent(NativeBlockStoreAPI* block_store_api, UInt64 chunk_count, UInt64* chunk_hashes, UInt32 minBlockUsagePercent, NativeAsyncGetExistingContentAPI* async_complete_api);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern int Longtail_BlockStore_GetStats(NativeBlockStoreAPI* block_store_api, ref NativeBlockStoreStats out_stats);
@@ -2819,7 +3094,7 @@ namespace LongtailLib
             [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_PutStoredBlockCallback put_stored_block_func,
             [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_PreflightGetCallback preflight_get_func,
             [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_GetStoredBlockCallback get_stored_block_func,
-            [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_RetargetContentCallback retarget_content_func,
+            [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_GetExistingContentCallback get_existing_content_func,
             [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_GetStatsCallback get_stats_func,
             [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_FlushCallback flush_func);
 

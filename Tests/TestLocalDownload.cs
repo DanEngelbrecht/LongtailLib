@@ -7,6 +7,7 @@ using System.IO.Abstractions;
 using System.Threading;
 using LongtailLib;
 using System.IO.Abstractions.TestingHelpers;
+using System.Text;
 
 namespace Tests
 {
@@ -17,7 +18,7 @@ namespace Tests
             m_StoragePath = storagePath;
         }
 
-        public void PreflightGet(ContentIndex contentIndex)
+        public void PreflightGet(UInt64[] chunkHashes)
         {
         }
 
@@ -32,6 +33,7 @@ namespace Tests
 
         public void PutStoredBlock(StoredBlock storedBlock, OnPutBlockComplete completeCallback)
         {
+
             throw new NotImplementedException();
         }
 
@@ -40,9 +42,12 @@ namespace Tests
             return new BlockStoreStats();
         }
 
-        public void RetargetContent(ContentIndex contentIndex, OnRetargetContentComplete completeCallback)
+        public void GetExistingContent(UInt64[] chunkHashes, UInt32 minBlockUsagePercent, OnGetExistingContentComplete completeCallback)
         {
-            throw new NotImplementedException();
+            string storeContentIndexPath = m_StoragePath + "\\store.lci";
+            byte[] storedBlockBuffer = File.ReadAllBytes(storeContentIndexPath);
+            ContentIndex contentIndex = API.ReadContentIndexFromBuffer(storedBlockBuffer);
+            completeCallback(contentIndex, null);
         }
 
         public void Flush(OnFlushComplete completeCallback)
@@ -92,9 +97,11 @@ namespace Tests
         }
     }
 
+
     [TestClass]
     public class UnitTestLocalDownload
     {
+        static string[] LogLevel = { "DEBUG", "INFO", "WARNING", "ERROR" };
         [TestMethod]
         public async Task TestDownsyncTotalCmd()
         {
@@ -128,9 +135,18 @@ namespace Tests
                     assertFailed = true;
                 });
             LogHandle logHandle = new LogHandle(
-                (int level, string message) =>
+                (LogContext logContext, string message) =>
                 {
-                    Debug.WriteLine(level.ToString() + ": " + message);
+                    var db = new StringBuilder();
+                    db.Append($"{logContext.File}({logContext.Line}) {logContext.Function}() {LogLevel[logContext.Level]}");
+                    db.Append(" {");
+                    for (int f = 0; f < logContext.FieldCount; ++f)
+                    {
+                        db.Append($" {logContext.FieldName(f)} : {logContext.FieldValue(f)}");
+                    }
+                    db.Append("} ");
+                    db.Append($": {message}");
+                    Debug.WriteLine(db.ToString());
                 });
             API.SetLogLevel(API.LOG_LEVEL_WARNING);
             CancellationToken cancellationToken = new CancellationToken();
