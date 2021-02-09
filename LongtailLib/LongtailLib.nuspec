@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
   <metadata>
     <id>LongtailLib</id>
-    <version>1.1.0</version>
+    <version>1.2.3</version>
     <title></title>
     <authors>dan.engelbrecht</authors>
     <owners>dan.engelbrecht</owners>

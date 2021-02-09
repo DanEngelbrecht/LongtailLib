@@ -931,6 +931,7 @@ namespace LongtailLib
             ChunkerAPI chunkerAPI,
             JobAPI jobAPI,
             ProgressFunc progress,
+            UInt32 progressPercentRateLimit,
             CancellationToken cancellationToken,
             string rootPath,
             FileInfos fileInfos,
@@ -943,7 +944,7 @@ namespace LongtailLib
             if (jobAPI == null) { throw new ArgumentException("CreateVersionIndex jobAPI is null"); }
             if (fileInfos == null) { throw new ArgumentException("CreateVersionIndex fileInfos is null"); }
 
-            ProgressHandle progressHandle = new ProgressHandle(progress);
+            ProgressHandle progressHandle = new ProgressHandle(progress, progressPercentRateLimit);
             CancelHandle cancelHandle = new CancelHandle(cancellationToken);
 
             var cStorageAPI = storageAPI.Native;
@@ -1362,6 +1363,7 @@ namespace LongtailLib
             HashAPI hashAPI,
             JobAPI jobAPI,
             ProgressFunc progress,
+            UInt32 progressPercentRateLimit,
             CancellationToken cancellationToken,
             ContentIndex contentIndex,
             VersionIndex sourceVersion,
@@ -1379,7 +1381,7 @@ namespace LongtailLib
             if (targetVersion == null) { throw new ArgumentException("ChangeVersion targetVersion is null"); }
             if (versionDiff == null) { throw new ArgumentException("ChangeVersion versionDiff is null"); }
 
-            ProgressHandle progressHandle = new ProgressHandle(progress);
+            ProgressHandle progressHandle = new ProgressHandle(progress, progressPercentRateLimit);
             CancelHandle cancelHandle = new CancelHandle(cancellationToken);
 
             var cBlockStoreAPI = blockStoreAPI.Native;
@@ -2221,7 +2223,7 @@ namespace LongtailLib
 
         private unsafe sealed class ProgressHandle : IDisposable
         {
-            public ProgressHandle(ProgressFunc progressFunc)
+            public ProgressHandle(ProgressFunc progressFunc, UInt32 progressPercentRateLimit)
             {
                 if (progressFunc == null)
                 {
@@ -2229,16 +2231,16 @@ namespace LongtailLib
                 }
                 m_ProgressFunc = progressFunc;
                 UInt64 mem_size = SafeNativeMethods.Longtail_GetProgressAPISize();
-                byte* mem = (byte*)API.Alloc(mem_size);
-                if (mem == null)
+                m_ProgressMem = (byte*)API.Alloc(mem_size);
+                if (m_ProgressMem == null)
                 {
                     throw new OutOfMemoryException();
                 }
                 m_Dispose =
                         (SafeNativeMethods.NativeAPI* api) =>
                         {
-                            SafeNativeMethods.Longtail_Free(_Native);
-                            _Native = null;
+                            SafeNativeMethods.Longtail_Free(m_ProgressMem);
+                            m_ProgressMem = null;
                         };
                 m_ProgressCallback =
                     (SafeNativeMethods.NativeProgressAPI* progress_api, UInt32 total_count, UInt32 done_count) =>
@@ -2252,8 +2254,16 @@ namespace LongtailLib
                             // Eat exception, there is no way to report errors currently
                         }
                     };
-                _Native = SafeNativeMethods.Longtail_MakeProgressAPI(mem, m_Dispose, m_ProgressCallback);
-
+                if (progressPercentRateLimit > 0)
+                {
+                    var progress = SafeNativeMethods.Longtail_MakeProgressAPI(m_ProgressMem, m_Dispose, m_ProgressCallback);
+                    // Limit callbacks for progress to every 1%
+                    _Native = SafeNativeMethods.Longtail_CreateRateLimitedProgress(progress, progressPercentRateLimit);
+                }
+                else
+                {
+                    _Native = SafeNativeMethods.Longtail_MakeProgressAPI(m_ProgressMem, m_Dispose, m_ProgressCallback);
+                }
             }
             public void Dispose()
             {
@@ -2271,6 +2281,7 @@ namespace LongtailLib
             SafeNativeMethods.Longtail_DisposeFunc m_Dispose;
             SafeNativeMethods.ProgressCallback m_ProgressCallback;
             ProgressFunc m_ProgressFunc;
+            byte* m_ProgressMem;
             SafeNativeMethods.NativeProgressAPI* _Native;
         };
 
@@ -3109,5 +3120,8 @@ namespace LongtailLib
             [MarshalAs(UnmanagedType.FunctionPtr)] Longtail_CancelAPI_CancelFunc cancel_func,
             [MarshalAs(UnmanagedType.FunctionPtr)] Longtail_CancelAPI_IsCancelledFunc is_cancelled_func,
             [MarshalAs(UnmanagedType.FunctionPtr)] Longtail_CancelAPI_DisposeTokenFunc dispose_token_func);
+
+        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
+        internal unsafe static extern NativeProgressAPI* Longtail_CreateRateLimitedProgress(NativeProgressAPI* backing_block_store, UInt32 percent_rate_limit);
     }
 }
