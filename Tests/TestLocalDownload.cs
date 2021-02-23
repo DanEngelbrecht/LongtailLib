@@ -44,10 +44,10 @@ namespace Tests
 
         public void GetExistingContent(UInt64[] chunkHashes, UInt32 minBlockUsagePercent, OnGetExistingContentComplete completeCallback)
         {
-            string storeContentIndexPath = m_StoragePath + "\\store.lci";
+            string storeContentIndexPath = m_StoragePath + "\\store.lsi";
             byte[] storedBlockBuffer = File.ReadAllBytes(storeContentIndexPath);
-            ContentIndex contentIndex = API.ReadContentIndexFromBuffer(storedBlockBuffer);
-            completeCallback(contentIndex, null);
+            StoreIndex storeIndex = API.ReadStoreIndexFromBuffer(storedBlockBuffer);
+            completeCallback(storeIndex, null);
         }
 
         public void Flush(OnFlushComplete completeCallback)
