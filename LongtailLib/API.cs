@@ -1083,13 +1083,9 @@ namespace LongtailLib
         public unsafe static StoreIndex GetExistingStoreIndex(
             StoreIndex storeIndex,
             UInt64[] chunkHashes,
-            UInt32 minBlockUsagePercent,
-            UInt32 maxBlockSize,
-            UInt32 maxChunksPerBlock)
+            UInt32 minBlockUsagePercent)
         {
             if (storeIndex == null) { throw new ArgumentException("GetExistingStoreIndex storeIndex is null"); }
-            if (maxBlockSize == 0) { throw new ArgumentException("GetExistingStoreIndex maxBlockSize zero"); }
-            if (maxChunksPerBlock == 0) { throw new ArgumentException("GetExistingStoreIndex maxChunksPerBlock is zero"); }
 
             var cStoreIndex = storeIndex.Native;
             GCHandle pinnedArray = GCHandle.Alloc(chunkHashes, GCHandleType.Pinned);
@@ -1101,8 +1097,6 @@ namespace LongtailLib
                 (UInt32)chunkHashes.Length,
                 (UInt64*)chunkHashesPtr,
                 minBlockUsagePercent,
-                maxBlockSize,
-                maxChunksPerBlock,
                 ref nativeStoreIndex);
             pinnedArray.Free();
             if (err == 0)
@@ -2759,8 +2753,6 @@ namespace LongtailLib
             UInt32 chunk_count,
             UInt64* chunk_hashes,
             UInt32 minBlockUsagePercent,
-            UInt32 minBlockSize,
-            UInt32 maxChunksPerBlock,
             ref NativeStoreIndex* out_store_index);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
