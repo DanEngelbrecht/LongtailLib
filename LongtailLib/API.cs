@@ -1593,7 +1593,7 @@ namespace LongtailLib
                                 }
                                 m_BlockStore.GetExistingContent(hashes, minBlockUsagePercent, (StoreIndex storeIndex, Exception e) =>
                                 {
-                                    SafeNativeMethods.Longtail_AsyncGetExistingContent_OnComplete(async_complete_api, storeIndex.Native == null ? null : storeIndex.Native, API.GetErrnoFromException(e, SafeNativeMethods.EIO));
+                                    SafeNativeMethods.Longtail_AsyncGetExistingContent_OnComplete(async_complete_api, storeIndex == null ? null : storeIndex.Native, API.GetErrnoFromException(e, SafeNativeMethods.EIO));
                                 });
                             }
                             catch (Exception e)
