@@ -68,7 +68,7 @@ namespace LongtailLib
             using (var versionDiff = API.CreateVersionDiff(hashAPI, currentVersionIndex, targetVersionIndex))
             {
                 var requiredChunkHashes = LongtailLib.API.GetRequiredChunkHashes(targetVersionIndex, versionDiff);
-                using (var remoteContentIndex = await LongtailLib.API.GetExistingContentIndex(blockStore, requiredChunkHashes, 0))
+                using (var remoteContentIndex = await LongtailLib.API.GetExistingContent(blockStore, requiredChunkHashes, 0))
                 {
                     await ChangeVersion(
                         blockStore,
@@ -130,7 +130,7 @@ namespace LongtailLib
             StorageAPI localStorageAPI,
             JobAPI jobAPI,
             HashAPI hashAPI,
-            ContentIndex remoteContentIndex,
+            StoreIndex remoteStoreIndex,
             VersionIndex currentVersionIndex,
             VersionIndex targetVersionIndex,
             VersionDiff versionDiff,
@@ -149,7 +149,7 @@ namespace LongtailLib
                         updateProgress,
                         5,
                         cancellationToken,
-                        remoteContentIndex,
+                        remoteStoreIndex,
                         currentVersionIndex,
                         targetVersionIndex,
                         versionDiff,
