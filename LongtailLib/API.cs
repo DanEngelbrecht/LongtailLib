@@ -14,6 +14,7 @@ namespace LongtailLib
     public delegate void ProgressFunc(UInt32 totalCount, UInt32 doneCount);
 
     public delegate void OnPutBlockComplete(Exception e);
+    public delegate void OnPreflightStartedComplete(UInt64[] blockHashes, Exception e);
     public delegate void OnGetBlockComplete(StoredBlock storedBlock, Exception e);
     public delegate void OnGetExistingContentComplete(StoreIndex storeIndex, Exception e);
     public delegate void OnFlushComplete(Exception e);
@@ -66,7 +67,7 @@ namespace LongtailLib
     public interface IBlockStore
     {
         void PutStoredBlock(StoredBlock storedBlock, OnPutBlockComplete completeCallback);
-        void PreflightGet(UInt64[] chunkHashes);
+        void PreflightGet(UInt64[] blockHashes, OnPreflightStartedComplete completeCallback);
         void GetStoredBlock(UInt64 blockHash, OnGetBlockComplete completeCallback);
         void GetExistingContent(UInt64[] chunkHashes, UInt32 minBlockUsagePercent, OnGetExistingContentComplete completeCallback);
         BlockStoreStats GetStats();
@@ -1545,16 +1546,31 @@ namespace LongtailLib
                         };
 
                 m_BlockStorePreflightGet =
-                        (SafeNativeMethods.NativeBlockStoreAPI* block_store_api, UInt32 chunkCount, UInt64* chunkHashes) =>
+                        (SafeNativeMethods.NativeBlockStoreAPI* block_store_api, UInt32 blockCount, UInt64* blockHashes, SafeNativeMethods.NativeAsyncPreflightStartedAPI* async_complete_api) =>
                         {
                             try
                             {
-                                var hashes = new UInt64[chunkCount];
-                                for (UInt32 i = 0; i < chunkCount; i++)
+                                var hashes = new UInt64[blockCount];
+                                for (UInt32 i = 0; i < blockCount; i++)
                                 {
-                                    hashes[i] = chunkHashes[i];
+                                    hashes[i] = blockHashes[i];
                                 }
-                                m_BlockStore.PreflightGet(hashes);
+                                m_BlockStore.PreflightGet(hashes, (UInt64[] fetchingBlockHashes, Exception e) =>
+                                {
+                                    if (async_complete_api == null)
+                                    {
+                                        return;
+                                    }
+                                    GCHandle pinnedArray = GCHandle.Alloc(fetchingBlockHashes, GCHandleType.Pinned);
+                                    IntPtr blockHashesPtr = pinnedArray.AddrOfPinnedObject();
+
+                                    SafeNativeMethods.Longtail_AsyncPreflightStarted_OnComplete(
+                                        async_complete_api,
+                                        (UInt32)fetchingBlockHashes.Length,
+                                        (UInt64*)blockHashesPtr,
+                                        API.GetErrnoFromException(e, SafeNativeMethods.EIO));
+                                    pinnedArray.Free();
+                                });
                                 return 0;
                             }
                             catch (Exception e)
@@ -2366,7 +2382,7 @@ namespace LongtailLib
         public unsafe delegate int BlockStore_PutStoredBlockCallback(NativeBlockStoreAPI* block_store_api, NativeStoredBlock* stored_block, NativeAsyncPutStoredBlockAPI* async_complete_api);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        public unsafe delegate int BlockStore_PreflightGetCallback(SafeNativeMethods.NativeBlockStoreAPI* block_store_api, UInt32 chunkCount, UInt64* chunkHashes);
+        public unsafe delegate int BlockStore_PreflightGetCallback(SafeNativeMethods.NativeBlockStoreAPI* block_store_api, UInt32 chunkCount, UInt64* chunkHashes, NativeAsyncPreflightStartedAPI* async_complete_api);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public unsafe delegate int BlockStore_GetStoredBlockCallback(NativeBlockStoreAPI* block_store_api, UInt64 block_hash, NativeAsyncGetStoredBlockAPI* async_complete_api);
@@ -2442,6 +2458,7 @@ namespace LongtailLib
         internal unsafe struct NativeProgressAPI { }
         internal unsafe struct NativePathFilterAPI { }
         internal unsafe struct NativeAsyncPutStoredBlockAPI { }
+        internal unsafe struct NativeAsyncPreflightStartedAPI { }
         internal unsafe struct NativeAsyncGetStoredBlockAPI { }
         internal unsafe struct NativeAsyncFlushAPI { }
         internal unsafe struct NativeAsyncGetExistingContentAPI { }
@@ -2671,6 +2688,9 @@ namespace LongtailLib
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern void Longtail_AsyncGetExistingContent_OnComplete(NativeAsyncGetExistingContentAPI* aSyncCompleteAPI, NativeStoreIndex* storeIndex, int res);
+
+        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
+        internal unsafe static extern void Longtail_AsyncPreflightStarted_OnComplete(NativeAsyncPreflightStartedAPI* aSyncCompleteAPI, UInt32 blockCount, UInt64* blockHashes, int res);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern UInt64 Longtail_GetAsyncFlushAPISize();

@@ -18,8 +18,9 @@ namespace Tests
             m_StoragePath = storagePath;
         }
 
-        public void PreflightGet(UInt64[] chunkHashes)
+        public void PreflightGet(UInt64[] blockHashes, OnPreflightStartedComplete completeCallback)
         {
+            completeCallback(blockHashes, null);
         }
 
         public void GetStoredBlock(UInt64 blockHash, OnGetBlockComplete completeCallback)
