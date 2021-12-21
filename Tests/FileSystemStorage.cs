@@ -47,7 +47,7 @@ namespace LongtailLib
 
                 Interlocked.Add(ref m_OpenFileCount, 1);
             }
-            catch(IOException e)
+            catch(IOException /*e*/)
             {
                 throw;
             }
@@ -79,7 +79,7 @@ namespace LongtailLib
 
                 Interlocked.Add(ref m_BytesRead, (long)length);
             }
-            catch (IOException e)
+            catch (IOException /*e*/)
             {
                 throw;
             }
@@ -104,7 +104,7 @@ namespace LongtailLib
                 outOpenFile = rawPtr;
                 Interlocked.Add(ref m_OpenFileCount, 1);
             }
-            catch (IOException e)
+            catch (IOException /*e*/)
             {
                 throw;
             }
@@ -125,7 +125,7 @@ namespace LongtailLib
 
                 Interlocked.Add(ref m_BytesWritten, (long)length);
             }
-            catch (IOException e)
+            catch (IOException /*e*/)
             {
                 throw;
             }
@@ -143,7 +143,7 @@ namespace LongtailLib
                 var s = openFile.m_Stream;
                 s.SetLength((long)length);
             }
-            catch (IOException e)
+            catch (IOException /*e*/)
             {
                 throw;
             }
@@ -225,7 +225,7 @@ namespace LongtailLib
                 string nativeTargetPath = DenormalizePath(targetPath);
                 m_FileSystem.File.Move(nativeSourcePath, nativeTargetPath);
             }
-            catch (IOException e)
+            catch (IOException /*e*/)
             {
                 throw;
             }

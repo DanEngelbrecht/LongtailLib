@@ -56,6 +56,11 @@ namespace Tests
             completeCallback(null);
         }
 
+        public void PruneBlocks(ulong[] blockKeepHashes, OnPruneComplete completeCallback)
+        {
+            completeCallback(0, null);
+        }
+
         private string m_StoragePath;
     }
 
