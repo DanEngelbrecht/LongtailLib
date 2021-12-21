@@ -17,6 +17,7 @@ namespace LongtailLib
     public delegate void OnPreflightStartedComplete(UInt64[] blockHashes, Exception e);
     public delegate void OnGetBlockComplete(StoredBlock storedBlock, Exception e);
     public delegate void OnGetExistingContentComplete(StoreIndex storeIndex, Exception e);
+    public delegate void OnPruneComplete(UInt32 prunedBlockCount, Exception e);
     public delegate void OnFlushComplete(Exception e);
 
     public enum StatU64 : UInt32 {
@@ -36,15 +37,19 @@ namespace LongtailLib
         GetExistingContent_RetryCount = 11,
         GetExistingContent_FailCount = 12,
 
-        PreflightGet_Count = 13,
-        PreflightGet_RetryCount = 14,
-        PreflightGet_FailCount = 15,
+        PruneBlocks_Count = 13,
+        PruneBlocks_RetryCount = 14,
+        PruneBlocks_FailCount = 15,
 
-        Flush_Count = 16,
-        Flush_FailCount = 17,
+        PreflightGet_Count = 16,
+        PreflightGet_RetryCount = 17,
+        PreflightGet_FailCount = 18,
 
-        GetStats_Count = 18,
-            Count = 19
+        Flush_Count = 19,
+        Flush_FailCount = 20,
+
+        GetStats_Count = 21,
+            Count = 22
     }
 
     public class BlockStoreStats
@@ -70,6 +75,7 @@ namespace LongtailLib
         void PreflightGet(UInt64[] blockHashes, OnPreflightStartedComplete completeCallback);
         void GetStoredBlock(UInt64 blockHash, OnGetBlockComplete completeCallback);
         void GetExistingContent(UInt64[] chunkHashes, UInt32 minBlockUsagePercent, OnGetExistingContentComplete completeCallback);
+        void PruneBlocks(UInt64[] blockKeepHashes, OnPruneComplete completeCallback);
         BlockStoreStats GetStats();
         void Flush(OnFlushComplete completeCallback);
     }
@@ -1365,8 +1371,6 @@ namespace LongtailLib
                 cJobAPI,
                 cStorageAPI,
                 contentPath,
-                default_max_block_size,
-                default_max_chunks_per_block,
                 null));
         }
         public unsafe static BlockStoreAPI CreateCacheBlockStoreAPI(
@@ -1597,6 +1601,29 @@ namespace LongtailLib
                             return 0;
                         };
 
+                m_PruneBlocks =
+                        (SafeNativeMethods.NativeBlockStoreAPI* block_store_api, UInt32 blockKeepCount, UInt64* blockKeepHashes, SafeNativeMethods.NativeAsyncPruneBlocksAPI* async_complete_api) =>
+                        {
+                            try
+                            {
+                                var hashes = new UInt64[blockKeepCount];
+                                for (UInt32 i = 0; i < blockKeepCount; i++)
+                                {
+                                    hashes[i] = blockKeepHashes[i];
+                                }
+                                m_BlockStore.PruneBlocks(hashes, (UInt32 prunedBlockCount, Exception e) =>
+                                {
+                                    SafeNativeMethods.Longtail_AsyncPruneBlocks_OnComplete(async_complete_api, prunedBlockCount, API.GetErrnoFromException(e, SafeNativeMethods.EIO));
+                                });
+                            }
+                            catch (Exception e)
+                            {
+                                int errno = API.GetErrnoFromException(e, SafeNativeMethods.EIO);
+                                SafeNativeMethods.Longtail_AsyncPruneBlocks_OnComplete(async_complete_api, 0, errno);
+                            }
+                            return 0;
+                        };
+
                 m_GetExistingContent =
                         (SafeNativeMethods.NativeBlockStoreAPI* block_store_api, UInt32 chunkCount, UInt64* chunkHashes, UInt32 minBlockUsagePercent, SafeNativeMethods.NativeAsyncGetExistingContentAPI* async_complete_api) =>
                         {
@@ -1664,6 +1691,7 @@ namespace LongtailLib
                         m_BlockStorePreflightGet,
                         m_BlockStoreGetStoredBlock,
                         m_GetExistingContent,
+                        m_PruneBlocks,
                         m_BlockStoreGetStats,
                         m_BlockStoreFlush));
             }
@@ -1672,6 +1700,7 @@ namespace LongtailLib
             SafeNativeMethods.BlockStore_PreflightGetCallback m_BlockStorePreflightGet;
             SafeNativeMethods.BlockStore_GetStoredBlockCallback m_BlockStoreGetStoredBlock;
             SafeNativeMethods.BlockStore_GetExistingContentCallback m_GetExistingContent;
+            SafeNativeMethods.BlockStore_PruneBlocksCallback m_PruneBlocks;
             SafeNativeMethods.BlockStore_GetStatsCallback m_BlockStoreGetStats;
             SafeNativeMethods.BlockStore_FlushCallback m_BlockStoreFlush;
 
@@ -1830,7 +1859,7 @@ namespace LongtailLib
                         {
                             m_Storage.CloseFile(f);
                         }
-                        catch (Exception e)
+                        catch (Exception /*e*/)
                         {
 //                            Log.Information("StorageAPI::CloseFile failed with {@e}", e);
                         }
@@ -1871,7 +1900,7 @@ namespace LongtailLib
                             string path = m_Storage.ConcatPath(rootPath, subPath);
                             return SafeNativeMethods.Longtail_Strdup(path);
                         }
-                        catch (Exception e)
+                        catch (Exception /*e*/)
                         {
 //                            Log.Information("StorageAPI::ConcatPath failed with {@e}", e);
                             return null;
@@ -1977,7 +2006,7 @@ namespace LongtailLib
                             }
                             m_Storage.CloseFind(iterator);
                         }
-                        catch (Exception e)
+                        catch (Exception /*e*/)
                         {
 //                            Log.Information("StorageAPI::CloseFind failed with {@e}", e);
                         }
@@ -2002,7 +2031,7 @@ namespace LongtailLib
                             m_AllocatedStrings.TryAdd(iterator, charPtr);
                             return 0;
                         }
-                        catch (Exception e)
+                        catch (Exception /*e*/)
                         {
 //                            Log.Information("StorageAPI::GetFileName failed with {@e}", e);
                             return 0;
@@ -2394,6 +2423,9 @@ namespace LongtailLib
         public unsafe delegate int BlockStore_GetExistingContentCallback(NativeBlockStoreAPI* block_store_api, UInt32 chunkCount, UInt64* chunkHashes, UInt32 minBlockUsagePercent, NativeAsyncGetExistingContentAPI* async_complete_api);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public unsafe delegate int BlockStore_PruneBlocksCallback(NativeBlockStoreAPI* block_store_api, UInt32 keepBlockCount, UInt64* blockHashes, NativeAsyncPruneBlocksAPI* async_complete_api);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public unsafe delegate int BlockStore_GetStatsCallback(NativeBlockStoreAPI* block_store_api, ref NativeBlockStoreStats out_stats);
 
         public unsafe delegate int Longtail_Storage_OpenReadFileFunc(NativeStorageAPI* storage_api, string path, ref IntPtr out_open_file);
@@ -2460,6 +2492,7 @@ namespace LongtailLib
         internal unsafe struct NativeAsyncPutStoredBlockAPI { }
         internal unsafe struct NativeAsyncPreflightStartedAPI { }
         internal unsafe struct NativeAsyncGetStoredBlockAPI { }
+        internal unsafe struct NativeAsyncPruneBlocksAPI { }
         internal unsafe struct NativeAsyncFlushAPI { }
         internal unsafe struct NativeAsyncGetExistingContentAPI { }
 
@@ -2690,6 +2723,9 @@ namespace LongtailLib
         internal unsafe static extern void Longtail_AsyncGetExistingContent_OnComplete(NativeAsyncGetExistingContentAPI* aSyncCompleteAPI, NativeStoreIndex* storeIndex, int res);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
+        internal unsafe static extern void Longtail_AsyncPruneBlocks_OnComplete(NativeAsyncPruneBlocksAPI* aSyncCompleteAPI, UInt32 prunedBlockCount, int res);
+
+        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern void Longtail_AsyncPreflightStarted_OnComplete(NativeAsyncPreflightStartedAPI* aSyncCompleteAPI, UInt32 blockCount, UInt64* blockHashes, int res);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
@@ -2851,7 +2887,7 @@ namespace LongtailLib
         internal unsafe static extern NativeCompressionRegistryAPI* Longtail_CreateFullCompressionRegistry();
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        internal unsafe static extern NativeBlockStoreAPI* Longtail_CreateFSBlockStoreAPI(NativeJobAPI* job_api, NativeStorageAPI* storage_api, [MarshalAs(UnmanagedType.LPStr)] string content_path, UInt32 default_max_block_size, UInt32 default_max_chunks_per_block, [MarshalAs(UnmanagedType.LPStr)] string optional_block_extension);
+        internal unsafe static extern NativeBlockStoreAPI* Longtail_CreateFSBlockStoreAPI(NativeJobAPI* job_api, NativeStorageAPI* storage_api, [MarshalAs(UnmanagedType.LPStr)] string content_path, [MarshalAs(UnmanagedType.LPStr)] string optional_block_extension);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern NativeBlockStoreAPI* Longtail_CreateCacheBlockStoreAPI(NativeJobAPI* job_api, NativeBlockStoreAPI* local_block_store, NativeBlockStoreAPI* remote_block_store);
@@ -2909,6 +2945,7 @@ namespace LongtailLib
             [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_PreflightGetCallback preflight_get_func,
             [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_GetStoredBlockCallback get_stored_block_func,
             [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_GetExistingContentCallback get_existing_content_func,
+            [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_PruneBlocksCallback prune_blocks_func,
             [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_GetStatsCallback get_stats_func,
             [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_FlushCallback flush_func);
 
