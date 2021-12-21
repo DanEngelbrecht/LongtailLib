@@ -524,15 +524,12 @@ namespace LongtailLib
                         // Eat exception, there is no way to report errors currently
                     }
                 };
-            m_PinnedLogCallback = GCHandle.Alloc(m_LogCallback, GCHandleType.Pinned);
             SafeNativeMethods.Longtail_SetLog(m_LogCallback, null);
         }
         public unsafe void Dispose()
         {
             SafeNativeMethods.Longtail_SetLog(null, null);
-            m_PinnedLogCallback.Free();
         }
-        GCHandle m_PinnedLogCallback;
         SafeNativeMethods.LogCallback m_LogCallback;
         LogFunc m_LogFunc;
     };
