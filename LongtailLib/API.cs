@@ -524,12 +524,15 @@ namespace LongtailLib
                         // Eat exception, there is no way to report errors currently
                     }
                 };
+            m_PinnedLogCallback = GCHandle.Alloc(m_LogCallback, GCHandleType.Pinned);
             SafeNativeMethods.Longtail_SetLog(m_LogCallback, null);
         }
         public unsafe void Dispose()
         {
             SafeNativeMethods.Longtail_SetLog(null, null);
+            m_PinnedLogCallback.Free();
         }
+        GCHandle m_PinnedLogCallback;
         SafeNativeMethods.LogCallback m_LogCallback;
         LogFunc m_LogFunc;
     };
@@ -1691,6 +1694,7 @@ namespace LongtailLib
                         m_BlockStorePreflightGet,
                         m_BlockStoreGetStoredBlock,
                         m_GetExistingContent,
+                        m_PruneBlocks,
                         m_BlockStoreGetStats,
                         m_BlockStoreFlush));
             }
@@ -2944,6 +2948,7 @@ namespace LongtailLib
             [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_PreflightGetCallback preflight_get_func,
             [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_GetStoredBlockCallback get_stored_block_func,
             [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_GetExistingContentCallback get_existing_content_func,
+            [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_PruneBlocksCallback prune_blocks_func,
             [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_GetStatsCallback get_stats_func,
             [MarshalAs(UnmanagedType.FunctionPtr)] BlockStore_FlushCallback flush_func);
 
