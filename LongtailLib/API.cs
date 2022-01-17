@@ -512,12 +512,12 @@ namespace LongtailLib
         {
             m_LogFunc = logFunc;
             m_LogCallback =
-                (SafeNativeMethods.NativeLogContext* log_context, string str) =>
+                (SafeNativeMethods.NativeLogContext* log_context, IntPtr str) =>
                 {
                     try
                     {
                         var logContext = new LogContext(log_context);
-                        m_LogFunc(logContext, str);
+                        m_LogFunc(logContext, SafeNativeMethods.StringFromNativeUtf8(str));
                     }
                     catch (Exception)
                     {
@@ -540,11 +540,11 @@ namespace LongtailLib
         {
             m_AssertFunc = assertFunc;
             m_AssertCallback =
-                (string expression, string file, int line) =>
+                (IntPtr expression, IntPtr file, int line) =>
                 {
                     try
                     {
-                        m_AssertFunc(expression, file, line);
+                        m_AssertFunc(SafeNativeMethods.StringFromNativeUtf8(expression), SafeNativeMethods.StringFromNativeUtf8(file), line);
                     }
                     catch (Exception)
                     {
@@ -696,7 +696,10 @@ namespace LongtailLib
         }
         public unsafe static void* Alloc(string context, UInt64 size)
         {
-            return SafeNativeMethods.Longtail_Alloc(context, size);
+            var nativeContext = SafeNativeMethods.NativeUtf8FromString(context);
+            void* r = SafeNativeMethods.Longtail_Alloc(nativeContext, size);
+            SafeNativeMethods.FreeNativeUtf8String(nativeContext);
+            return r;
         }
         public unsafe static void Free(void* data)
         {
@@ -715,16 +718,18 @@ namespace LongtailLib
             }
             PathFilterAPI pathFilterAPI = MakePathFilter(pathFilterFunc);
             CancelHandle cancelHandle = new CancelHandle(cancellationToken);
+            IntPtr cRootPath = SafeNativeMethods.NativeUtf8FromString(rootPath);
             SafeNativeMethods.NativeFileInfos* nativeFileInfos = null;
             int err = SafeNativeMethods.Longtail_GetFilesRecursively(
                 storageAPI.Native,
-                pathFilterAPI.Native,
+                pathFilterAPI != null ? pathFilterAPI.Native : null,
                 cancelHandle.Native,
                 (IntPtr)cancelHandle.Native,    // We don't have a dedicated token
-                rootPath,
+                cRootPath,
                 ref nativeFileInfos);
+            SafeNativeMethods.FreeNativeUtf8String(cRootPath);
             cancelHandle.Dispose();
-            pathFilterAPI.Dispose();
+            pathFilterAPI?.Dispose();
             if (err == 0)
             {
                 return new FileInfos(nativeFileInfos);
@@ -738,6 +743,14 @@ namespace LongtailLib
             if (fileInfos == null) { return 0; }
             var cFileInfos = fileInfos.Native;
             return SafeNativeMethods.Longtail_FileInfos_GetCount(cFileInfos);
+        }
+
+        public unsafe static string FileInfosGetPath(FileInfos fileInfos, UInt32 index)
+        {
+            if (fileInfos == null) { return ""; }
+            var cFileInfos = fileInfos.Native;
+            IntPtr cString = SafeNativeMethods.Longtail_FileInfos_GetPath(cFileInfos, index);
+            return SafeNativeMethods.StringFromNativeUtf8(cString);
         }
 
         public static BlockStoreAPI MakeBlockStore(IBlockStore blockStore)
@@ -917,6 +930,7 @@ namespace LongtailLib
             var cProgressHandle = progressHandle.Native;
             var cCancelHandle = cancelHandle.Native;
             var cFileInfos = fileInfos.Native;
+            IntPtr cRootPath = SafeNativeMethods.NativeUtf8FromString(rootPath);
 
             SafeNativeMethods.NativeVersionIndex* nativeVersionIndex = null;
             int err = SafeNativeMethods.Longtail_CreateVersionIndex(
@@ -927,11 +941,12 @@ namespace LongtailLib
                 cProgressHandle,
                 cCancelHandle,
                 (IntPtr)cCancelHandle,    // We don't have a dedicated token
-                rootPath,
+                cRootPath,
                 cFileInfos,
                 optional_assetTags,
                 maxChunkSize,
                 ref nativeVersionIndex);
+            SafeNativeMethods.FreeNativeUtf8String(cRootPath);
             cancelHandle.Dispose();
             progressHandle.Dispose();
             if (err == 0)
@@ -963,11 +978,13 @@ namespace LongtailLib
             if (path == null) { throw new ArgumentException("ReadVersionIndex path is null"); }
 
             var cStorageAPI = storageAPI.Native;
+            IntPtr cPath = SafeNativeMethods.NativeUtf8FromString(path);
             SafeNativeMethods.NativeVersionIndex* nativeVersionIndex = null;
             int err = SafeNativeMethods.Longtail_ReadVersionIndex(
                 cStorageAPI,
-                path,
+                cPath,
                 ref nativeVersionIndex);
+            SafeNativeMethods.FreeNativeUtf8String(cPath);
             if (err == 0)
             {
                 return new VersionIndex(nativeVersionIndex);
@@ -997,11 +1014,13 @@ namespace LongtailLib
             if (path == null) { throw new ArgumentException("ReadStoreIndex path is null"); }
 
             var cStorageAPI = storageAPI.Native;
+            IntPtr cPath = SafeNativeMethods.NativeUtf8FromString(path);
             SafeNativeMethods.NativeStoreIndex* nativeStoreIndex = null;
             int err = SafeNativeMethods.Longtail_ReadStoreIndex(
                 cStorageAPI,
-                path,
+                cPath,
                 ref nativeStoreIndex);
+            SafeNativeMethods.FreeNativeUtf8String(cPath);
             if (err == 0)
             {
                 return new StoreIndex(nativeStoreIndex);
@@ -1033,30 +1052,6 @@ namespace LongtailLib
             ThrowExceptionFromErrno("CreateMissingContent", "", err);
             return null;
         }
-
-/*        public unsafe static ContentIndex GetMissingContent(
-            UInt32 hashIdentifier,
-            ContentIndex referenceContentIndex,
-            ContentIndex contentIndex)
-        {
-            if (referenceContentIndex == null) { throw new ArgumentException("GetMissingContent reference_content_index is null"); }
-            if (contentIndex == null) { throw new ArgumentException("GetMissingContent content_index is null"); }
-
-            var cReferenceContentIndex = referenceContentIndex.Native;
-            var cContentIndex = contentIndex.Native;
-            SafeNativeMethods.NativeContentIndex* nativeContentIndex = null;
-            int err = SafeNativeMethods.Longtail_GetMissingContent(
-                hashIdentifier,
-                cReferenceContentIndex,
-                cContentIndex,
-                ref nativeContentIndex);
-            if (err == 0)
-            {
-                return new ContentIndex(nativeContentIndex);
-            }
-            ThrowExceptionFromErrno("GetMissingContent", "", err);
-            return null;
-        }*/
 
         public unsafe static UInt64[] GetRequiredChunkHashes(
             VersionIndex versionIndex,
@@ -1261,6 +1256,7 @@ namespace LongtailLib
             var cSourceVersion = sourceVersion.Native;
             var cTargetVersion = targetVersion.Native;
             var cVersionDiff = versionDiff.Native;
+            var cVersionPath = SafeNativeMethods.NativeUtf8FromString(versionPath);
 
             int err = SafeNativeMethods.Longtail_ChangeVersion(
                 cBlockStoreAPI,
@@ -1274,8 +1270,9 @@ namespace LongtailLib
                 cSourceVersion,
                 cTargetVersion,
                 cVersionDiff,
-                versionPath,
+                cVersionPath,
                 retainPermissions ? 1 : 0);
+            SafeNativeMethods.FreeNativeUtf8String(cVersionPath);
             cancelHandle.Dispose();
             progressHandle.Dispose();
             if (err == 0)
@@ -1366,12 +1363,15 @@ namespace LongtailLib
 
             var cStorageAPI = storageAPI.Native;
             var cJobAPI = jobAPI.Native;
+            var cContentPath = SafeNativeMethods.NativeUtf8FromString(contentPath);
 
-            return new BlockStoreAPI(SafeNativeMethods.Longtail_CreateFSBlockStoreAPI(
+            var store = new BlockStoreAPI(SafeNativeMethods.Longtail_CreateFSBlockStoreAPI(
                 cJobAPI,
                 cStorageAPI,
-                contentPath,
-                null));
+                cContentPath,
+                IntPtr.Zero));
+            SafeNativeMethods.FreeNativeUtf8String(cContentPath);
+            return store;
         }
         public unsafe static BlockStoreAPI CreateCacheBlockStoreAPI(
             JobAPI jobAPI,
@@ -1468,11 +1468,13 @@ namespace LongtailLib
             if (path == null) { throw new ArgumentException("ReadStoredBlock path is null"); }
 
             var cStorageAPI = storageAPI.Native;
+            var cPath = SafeNativeMethods.NativeUtf8FromString(path);
             SafeNativeMethods.NativeStoredBlock* nativeStoredBlock = null;
             int err = SafeNativeMethods.Longtail_ReadStoredBlock(
                 cStorageAPI,
-                path,
+                cPath,
                 ref nativeStoredBlock);
+            SafeNativeMethods.FreeNativeUtf8String(cPath);
             if (err == 0)
             {
                 return new StoredBlock(nativeStoredBlock);
@@ -1489,7 +1491,10 @@ namespace LongtailLib
 
             var cStorageAPI = storageAPI.Native;
             var cStoredBlock = storedBlock.Native;
-            return SafeNativeMethods.Longtail_WriteStoredBlock(cStorageAPI, cStoredBlock, path);
+            var cPath = SafeNativeMethods.NativeUtf8FromString(path);
+            var block = SafeNativeMethods.Longtail_WriteStoredBlock(cStorageAPI, cStoredBlock, cPath);
+            SafeNativeMethods.FreeNativeUtf8String(cPath);
+            return block;
         }
 
         public unsafe static byte[] WriteStoredBlockToBuffer(StoredBlock storedBlock)
@@ -1736,11 +1741,11 @@ namespace LongtailLib
                         };
 
                 m_OpenReadFileFunc =
-                    (SafeNativeMethods.NativeStorageAPI* storage_api, string path, ref IntPtr outOpenFile) =>
+                    (SafeNativeMethods.NativeStorageAPI* storage_api, IntPtr path, ref IntPtr outOpenFile) =>
                     {
                         try
                         {
-                            m_Storage.OpenReadFile(path, ref outOpenFile);
+                            m_Storage.OpenReadFile(SafeNativeMethods.StringFromNativeUtf8(path), ref outOpenFile);
                             return 0;
                         }
                         catch (Exception e)
@@ -1780,11 +1785,11 @@ namespace LongtailLib
                         }
                     };
                 m_OpenWriteFileFunc =
-                    (SafeNativeMethods.NativeStorageAPI* storage_api, string path, UInt64 initialSize, ref IntPtr outOpenFile) =>
+                    (SafeNativeMethods.NativeStorageAPI* storage_api, IntPtr path, UInt64 initialSize, ref IntPtr outOpenFile) =>
                     {
                         try
                         {
-                            m_Storage.OpenWriteFile(path, initialSize, ref outOpenFile);
+                            m_Storage.OpenWriteFile(SafeNativeMethods.StringFromNativeUtf8(path), initialSize, ref outOpenFile);
                             return 0;
                         }
                         catch (Exception e)
@@ -1824,11 +1829,11 @@ namespace LongtailLib
                         }
                     };
                 m_SetPermissionsFunc =
-                    (SafeNativeMethods.NativeStorageAPI* storage_api, string path, UInt16 permissions) =>
+                    (SafeNativeMethods.NativeStorageAPI* storage_api, IntPtr path, UInt16 permissions) =>
                     {
                         try
                         {
-                            m_Storage.SetPermissions(path, permissions);
+                            m_Storage.SetPermissions(SafeNativeMethods.StringFromNativeUtf8(path), permissions);
                             return 0;
                         }
                         catch (Exception e)
@@ -1838,11 +1843,11 @@ namespace LongtailLib
                         }
                     };
                 m_GetPermissionsFunc =
-                    (SafeNativeMethods.NativeStorageAPI* storage_api, string path, ref UInt16 out_permissions) =>
+                    (SafeNativeMethods.NativeStorageAPI* storage_api, IntPtr path, ref UInt16 out_permissions) =>
                     {
                         try
                         {
-                            out_permissions = m_Storage.GetPermissions(path);
+                            out_permissions = m_Storage.GetPermissions(SafeNativeMethods.StringFromNativeUtf8(path));
                             return 0;
                         }
                         catch (Exception e)
@@ -1865,11 +1870,11 @@ namespace LongtailLib
                         }
                     };
                 m_CreateDirFunc =
-                    (SafeNativeMethods.NativeStorageAPI* storage_api, string path) =>
+                    (SafeNativeMethods.NativeStorageAPI* storage_api, IntPtr path) =>
                     {
                         try
                         {
-                            m_Storage.CreateDir(path);
+                            m_Storage.CreateDir(SafeNativeMethods.StringFromNativeUtf8(path));
                             return 0;
                         }
                         catch (Exception e)
@@ -1879,11 +1884,11 @@ namespace LongtailLib
                         }
                     };
                 m_RenameFileFunc =
-                    (SafeNativeMethods.NativeStorageAPI* storage_api, string sourcePath, string targetPath) =>
+                    (SafeNativeMethods.NativeStorageAPI* storage_api, IntPtr sourcePath, IntPtr targetPath) =>
                     {
                         try
                         {
-                            m_Storage.RenameFile(sourcePath, targetPath);
+                            m_Storage.RenameFile(SafeNativeMethods.StringFromNativeUtf8(sourcePath), SafeNativeMethods.StringFromNativeUtf8(targetPath));
                             return 0;
                         }
                         catch (Exception e)
@@ -1893,25 +1898,28 @@ namespace LongtailLib
                         }
                     };
                 m_ConcatPathFunc =
-                    (SafeNativeMethods.NativeStorageAPI* storage_api, string rootPath, string subPath) =>
+                    (SafeNativeMethods.NativeStorageAPI* storage_api, IntPtr rootPath, IntPtr subPath) =>
                     {
                         try
                         {
-                            string path = m_Storage.ConcatPath(rootPath, subPath);
-                            return SafeNativeMethods.Longtail_Strdup(path);
+                            string path = m_Storage.ConcatPath(SafeNativeMethods.StringFromNativeUtf8(rootPath), SafeNativeMethods.StringFromNativeUtf8(subPath));
+                            IntPtr nativeString = SafeNativeMethods.NativeUtf8FromString(path);
+                            var result = SafeNativeMethods.Longtail_Strdup(nativeString);
+                            SafeNativeMethods.FreeNativeUtf8String(nativeString);
+                            return result;
                         }
                         catch (Exception /*e*/)
                         {
 //                            Log.Information("StorageAPI::ConcatPath failed with {@e}", e);
-                            return null;
+                            return IntPtr.Zero;
                         }
                     };
                 m_IsDirFunc =
-                    (SafeNativeMethods.NativeStorageAPI* storage_api, string path) =>
+                    (SafeNativeMethods.NativeStorageAPI* storage_api, IntPtr path) =>
                     {
                         try
                         {
-                            bool isDir = m_Storage.IsDir(path);
+                            bool isDir = m_Storage.IsDir(SafeNativeMethods.StringFromNativeUtf8(path));
                             return isDir ? 1 : 0;
                         }
                         catch (Exception e)
@@ -1921,11 +1929,11 @@ namespace LongtailLib
                         }
                     };
                 m_IsFileFunc =
-                    (SafeNativeMethods.NativeStorageAPI* storage_api, string path) =>
+                    (SafeNativeMethods.NativeStorageAPI* storage_api, IntPtr path) =>
                     {
                         try
                         {
-                            bool isFile = m_Storage.IsFile(path);
+                            bool isFile = m_Storage.IsFile(SafeNativeMethods.StringFromNativeUtf8(path));
                             return isFile ? 1 : 0;
                         }
                         catch (Exception e)
@@ -1935,11 +1943,11 @@ namespace LongtailLib
                         }
                     };
                 m_RemoveDirFunc =
-                    (SafeNativeMethods.NativeStorageAPI* storage_api, string path) =>
+                    (SafeNativeMethods.NativeStorageAPI* storage_api, IntPtr path) =>
                     {
                         try
                         {
-                            m_Storage.RemoveDir(path);
+                            m_Storage.RemoveDir(SafeNativeMethods.StringFromNativeUtf8(path));
                             return 0;
                         }
                         catch (Exception e)
@@ -1949,11 +1957,11 @@ namespace LongtailLib
                         }
                     };
                 m_RemoveFileFunc =
-                    (SafeNativeMethods.NativeStorageAPI* storage_api, string path) =>
+                    (SafeNativeMethods.NativeStorageAPI* storage_api, IntPtr path) =>
                     {
                         try
                         {
-                            m_Storage.RemoveFile(path);
+                            m_Storage.RemoveFile(SafeNativeMethods.StringFromNativeUtf8(path));
                             return 0;
                         }
                         catch (Exception e)
@@ -1963,11 +1971,11 @@ namespace LongtailLib
                         }
                     };
                 m_StartFindFunc =
-                    (SafeNativeMethods.NativeStorageAPI* storage_api, string path, ref IntPtr outIterator) =>
+                    (SafeNativeMethods.NativeStorageAPI* storage_api, IntPtr path, ref IntPtr outIterator) =>
                     {
                         try
                         {
-                            bool hasEntries = m_Storage.StartFind(path, ref outIterator);
+                            bool hasEntries = m_Storage.StartFind(SafeNativeMethods.StringFromNativeUtf8(path), ref outIterator);
                             if (hasEntries)
                             {
                                 return 0;
@@ -1985,6 +1993,11 @@ namespace LongtailLib
                     {
                         try
                         {
+                            IntPtr oldNativeString;
+                            if (m_AllocatedStrings.TryRemove(iterator, out oldNativeString))
+                            {
+                                SafeNativeMethods.FreeNativeUtf8String(oldNativeString);
+                            }
                             bool hasMore = m_Storage.FindNext(iterator);
                             return hasMore ? 0 : SafeNativeMethods.ENOENT;
                         }
@@ -2002,7 +2015,7 @@ namespace LongtailLib
                             IntPtr oldNativeString;
                             if (m_AllocatedStrings.TryRemove(iterator, out oldNativeString))
                             {
-                                SafeNativeMethods.Longtail_Free((void*)oldNativeString);
+                                SafeNativeMethods.FreeNativeUtf8String(oldNativeString);
                             }
                             m_Storage.CloseFind(iterator);
                         }
@@ -2019,16 +2032,15 @@ namespace LongtailLib
                             IntPtr oldNativeString;
                             if (m_AllocatedStrings.TryRemove(iterator, out oldNativeString))
                             {
-                                SafeNativeMethods.Longtail_Free((void*)oldNativeString);
+                                SafeNativeMethods.FreeNativeUtf8String(oldNativeString);
                             }
                             var properties = m_Storage.GetEntryProperties(iterator);
-                            char* nativeString = SafeNativeMethods.Longtail_Strdup(properties.m_FileName);
-                            IntPtr charPtr = (IntPtr)nativeString;
+                            IntPtr nativeString = SafeNativeMethods.NativeUtf8FromString(properties.m_FileName);
                             out_properties.m_FileName = nativeString;
                             out_properties.m_Size = properties.m_Size;
                             out_properties.m_Permissions = properties.m_Permissions;
                             out_properties.m_IsDir = properties.m_IsDir ? 1 : 0;
-                            m_AllocatedStrings.TryAdd(iterator, charPtr);
+                            m_AllocatedStrings.TryAdd(iterator, nativeString);
                             return 0;
                         }
                         catch (Exception /*e*/)
@@ -2038,11 +2050,11 @@ namespace LongtailLib
                         }
                     };
                 m_LockFileFunc =
-                    (SafeNativeMethods.NativeStorageAPI* storage_api, string path, ref IntPtr outOpenFile) =>
+                    (SafeNativeMethods.NativeStorageAPI* storage_api, IntPtr path, ref IntPtr outOpenFile) =>
                     {
                         try
                         {
-                            m_Storage.LockFile(path, ref outOpenFile);
+                            m_Storage.LockFile(SafeNativeMethods.StringFromNativeUtf8(path), ref outOpenFile);
                             return 0;
                         }
                         catch (Exception e)
@@ -2299,11 +2311,11 @@ namespace LongtailLib
                         };
 
                 m_PathFilterCallback =
-                    (SafeNativeMethods.NativePathFilterAPI* path_filter_api, string root_path, string asset_path, string asset_name, int is_dir, UInt64 size, UInt16 permissions) =>
+                    (SafeNativeMethods.NativePathFilterAPI* path_filter_api, IntPtr root_path, IntPtr asset_path, IntPtr asset_name, int is_dir, UInt64 size, UInt16 permissions) =>
                     {
                         try
                         {
-                            bool result = m_PathFilterFunc(root_path, asset_path, asset_name, is_dir != 0, (ulong)size, (uint)permissions);
+                            bool result = m_PathFilterFunc(SafeNativeMethods.StringFromNativeUtf8(root_path), SafeNativeMethods.StringFromNativeUtf8(asset_path), SafeNativeMethods.StringFromNativeUtf8(asset_name), is_dir != 0, (ulong)size, (uint)permissions);
                             return result ? 1 : 0;
                         }
                         catch (Exception)
@@ -2381,10 +2393,10 @@ namespace LongtailLib
         public const int ECANCELED = 105; /* Operation was cancelled */
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        public delegate void AssertCallback(string expression, string file, int line);
+        public delegate void AssertCallback(IntPtr expression, IntPtr file, int line);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        public unsafe delegate void LogCallback(SafeNativeMethods.NativeLogContext* context, string str);
+        public unsafe delegate void LogCallback(SafeNativeMethods.NativeLogContext* context, IntPtr str);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public unsafe delegate void Longtail_DisposeFunc(NativeAPI* api);
@@ -2393,7 +2405,7 @@ namespace LongtailLib
         public unsafe delegate void ProgressCallback(NativeProgressAPI* progress_api, UInt32 totalCount, UInt32 doneCount);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        public unsafe delegate int PathFilterCallback(NativePathFilterAPI* path_filter_api, string root_path, string asset_path, string asset_name, int is_dir, UInt64 size, UInt16 permissions);
+        public unsafe delegate int PathFilterCallback(NativePathFilterAPI* path_filter_api, IntPtr root_path, IntPtr asset_path, IntPtr asset_name, int is_dir, UInt64 size, UInt16 permissions);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public unsafe delegate int ASyncPutStoredBlockCompleteCallback(NativeAsyncPutStoredBlockAPI* asyncCompleteAPI, int err);
@@ -2428,27 +2440,27 @@ namespace LongtailLib
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public unsafe delegate int BlockStore_GetStatsCallback(NativeBlockStoreAPI* block_store_api, ref NativeBlockStoreStats out_stats);
 
-        public unsafe delegate int Longtail_Storage_OpenReadFileFunc(NativeStorageAPI* storage_api, string path, ref IntPtr out_open_file);
+        public unsafe delegate int Longtail_Storage_OpenReadFileFunc(NativeStorageAPI* storage_api, IntPtr path, ref IntPtr out_open_file);
         public unsafe delegate int Longtail_Storage_GetSizeFunc(NativeStorageAPI* storage_api, IntPtr f, ref UInt64 out_size);
         public unsafe delegate int Longtail_Storage_ReadFunc(NativeStorageAPI* storage_api, IntPtr f, UInt64 offset, UInt64 length, void* output);
-        public unsafe delegate int Longtail_Storage_OpenWriteFileFunc(NativeStorageAPI* storage_api, string path, UInt64 initial_size, ref IntPtr out_open_file);
+        public unsafe delegate int Longtail_Storage_OpenWriteFileFunc(NativeStorageAPI* storage_api, IntPtr path, UInt64 initial_size, ref IntPtr out_open_file);
         public unsafe delegate int Longtail_Storage_WriteFunc(NativeStorageAPI* storage_api, IntPtr f, UInt64 offset, UInt64 length, void* input);
         public unsafe delegate int Longtail_Storage_SetSizeFunc(NativeStorageAPI* storage_api, IntPtr f, UInt64 length);
-        public unsafe delegate int Longtail_Storage_SetPermissionsFunc(NativeStorageAPI* storage_api, string path, UInt16 permissions);
-        public unsafe delegate int Longtail_Storage_GetPermissionsFunc(NativeStorageAPI* storage_api, string path, ref UInt16 out_permissions);
+        public unsafe delegate int Longtail_Storage_SetPermissionsFunc(NativeStorageAPI* storage_api, IntPtr path, UInt16 permissions);
+        public unsafe delegate int Longtail_Storage_GetPermissionsFunc(NativeStorageAPI* storage_api, IntPtr path, ref UInt16 out_permissions);
         public unsafe delegate void Longtail_Storage_CloseFileFunc(NativeStorageAPI* storage_api, IntPtr f);
-        public unsafe delegate int Longtail_Storage_CreateDirFunc(NativeStorageAPI* storage_api, string path);
-        public unsafe delegate int Longtail_Storage_RenameFileFunc(NativeStorageAPI* storage_api, string source_path, string target_path);
-        public unsafe delegate char* Longtail_Storage_ConcatPathFunc(NativeStorageAPI* storage_api, string root_path, string sub_path);
-        public unsafe delegate int Longtail_Storage_IsDirFunc(NativeStorageAPI* storage_api, string path);
-        public unsafe delegate int Longtail_Storage_IsFileFunc(NativeStorageAPI* storage_api, string path);
-        public unsafe delegate int Longtail_Storage_RemoveDirFunc(NativeStorageAPI* storage_api, string path);
-        public unsafe delegate int Longtail_Storage_RemoveFileFunc(NativeStorageAPI* storage_api, string path);
-        public unsafe delegate int Longtail_Storage_StartFindFunc(NativeStorageAPI* storage_api, string path, ref IntPtr out_iterator);
+        public unsafe delegate int Longtail_Storage_CreateDirFunc(NativeStorageAPI* storage_api, IntPtr path);
+        public unsafe delegate int Longtail_Storage_RenameFileFunc(NativeStorageAPI* storage_api, IntPtr source_path, IntPtr target_path);
+        public unsafe delegate IntPtr Longtail_Storage_ConcatPathFunc(NativeStorageAPI* storage_api, IntPtr root_path, IntPtr sub_path);
+        public unsafe delegate int Longtail_Storage_IsDirFunc(NativeStorageAPI* storage_api, IntPtr path);
+        public unsafe delegate int Longtail_Storage_IsFileFunc(NativeStorageAPI* storage_api, IntPtr path);
+        public unsafe delegate int Longtail_Storage_RemoveDirFunc(NativeStorageAPI* storage_api, IntPtr path);
+        public unsafe delegate int Longtail_Storage_RemoveFileFunc(NativeStorageAPI* storage_api, IntPtr path);
+        public unsafe delegate int Longtail_Storage_StartFindFunc(NativeStorageAPI* storage_api, IntPtr path, ref IntPtr out_iterator);
         public unsafe delegate int Longtail_Storage_FindNextFunc(NativeStorageAPI* storage_api, IntPtr iterator);
         public unsafe delegate void Longtail_Storage_CloseFindFunc(NativeStorageAPI* storage_api, IntPtr iterator);
         public unsafe delegate int Longtail_Storage_GetEntryPropertiesFunc(NativeStorageAPI* storage_api, IntPtr iterator, ref NativeStorageAPIProperties out_properties);
-        public unsafe delegate int Longtail_Storage_LockFileFunc(NativeStorageAPI* storage_api, string path, ref IntPtr out_lock_file);
+        public unsafe delegate int Longtail_Storage_LockFileFunc(NativeStorageAPI* storage_api, IntPtr path, ref IntPtr out_lock_file);
         public unsafe delegate int Longtail_Storage_UnlockFileFunc(NativeStorageAPI* storage_api, IntPtr lock_file);
 
         public unsafe delegate int Longtail_CancelAPI_CreateTokenFunc(NativeCancelAPI* cancel_api, ref IntPtr out_token);
@@ -2456,10 +2468,10 @@ namespace LongtailLib
         public unsafe delegate int Longtail_CancelAPI_IsCancelledFunc(NativeCancelAPI* cancel_api, IntPtr token);
         public unsafe delegate int Longtail_CancelAPI_DisposeTokenFunc(NativeCancelAPI* cancel_api, IntPtr token);
 
-        [DllImport(LongtailDLLName, CharSet = CharSet.Ansi)]
+        [DllImport(LongtailDLLName)]
         internal unsafe static extern UInt64 Longtail_GetStorageAPISize();
 
-        [DllImport(LongtailDLLName, CharSet = CharSet.Ansi)]
+        [DllImport(LongtailDLLName)]
         internal unsafe static extern NativeStorageAPI* Longtail_MakeStorageAPI(
             void* mem,
             Longtail_DisposeFunc dispose_func,
@@ -2542,10 +2554,10 @@ namespace LongtailLib
             }
         }
 
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+        [StructLayout(LayoutKind.Sequential)]
         internal unsafe struct NativeStorageAPIProperties
         {
-            public char* m_FileName;
+            public IntPtr m_FileName;
             public UInt64 m_Size;
             public UInt16 m_Permissions;
             public Int32 m_IsDir;
@@ -2559,7 +2571,7 @@ namespace LongtailLib
             UInt64* m_Sizes;
             UInt32* m_PathStartOffsets;
             UInt16* m_Permissions;
-            char* m_PathData;
+            IntPtr m_PathData;
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -2583,7 +2595,7 @@ namespace LongtailLib
             UInt32* m_NameOffsets;
             UInt32 m_NameDataSize;
             UInt16* m_Permissions;
-            char* m_NameData;
+            IntPtr m_NameData;
 
             public unsafe UInt32 GetHashIdentifier() { return *m_HashIdentifier; }
             public unsafe UInt32 GetTargetChunkSize() { return *m_TargetChunkSize; }
@@ -2600,33 +2612,46 @@ namespace LongtailLib
             }
         }
 
-        static internal unsafe string CStrToString(char* cStr)
+        public static IntPtr NativeUtf8FromString(string managedString)
         {
-            var p = (sbyte*)cStr;
-            int len = 0;
-            while (p[len] != 0)
-            {
-                ++len;
-            }
-            return new string((sbyte*)cStr, 0, len, Encoding.ASCII);
+            int len = Encoding.UTF8.GetByteCount(managedString);
+            byte[] buffer = new byte[len + 1];
+            Encoding.UTF8.GetBytes(managedString, 0, managedString.Length, buffer, 0);
+            IntPtr nativeUtf8 = Marshal.AllocHGlobal(buffer.Length);
+            Marshal.Copy(buffer, 0, nativeUtf8, buffer.Length);
+            return nativeUtf8;
         }
 
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+        public static void FreeNativeUtf8String(IntPtr nativeString)
+        {
+            Marshal.FreeHGlobal(nativeString);
+        }
+
+        public static string StringFromNativeUtf8(IntPtr nativeUtf8)
+        {
+            int len = 0;
+            while (Marshal.ReadByte(nativeUtf8, len) != 0) ++len;
+            byte[] buffer = new byte[len];
+            Marshal.Copy(nativeUtf8, buffer, 0, buffer.Length);
+            return Encoding.UTF8.GetString(buffer);
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
         internal unsafe struct NativeLogContext
         {
             void* m_Context;
-            char* m_File;
-            char* m_Function;
-            char** m_Fields;
+            IntPtr m_File;
+            IntPtr m_Function;
+            IntPtr* m_Fields;
             Int32 m_FieldCount;
             Int32 m_Line;
             Int32 m_Level;
 
-            public unsafe string GetFile() { return CStrToString(m_File);}
-            public unsafe string GetFunction() { return CStrToString(m_Function); }
+            public unsafe string GetFile() { return StringFromNativeUtf8(m_File);}
+            public unsafe string GetFunction() { return StringFromNativeUtf8(m_Function); }
             public unsafe int GetFieldCount() { return (int)m_FieldCount; }
-            public unsafe string GetFieldName(int fieldIndex) { return CStrToString(m_Fields[fieldIndex * 2 + 0]); }
-            public unsafe string GetFieldValue(int fieldIndex) { return CStrToString(m_Fields[fieldIndex * 2 + 1]); }
+            public unsafe string GetFieldName(int fieldIndex) { return StringFromNativeUtf8(m_Fields[fieldIndex * 2 + 0]); }
+            public unsafe string GetFieldValue(int fieldIndex) { return StringFromNativeUtf8(m_Fields[fieldIndex * 2 + 1]); }
             public unsafe Int32 GetLine() { return m_Line; }
             public unsafe Int32 GetLevel() { return m_Level; }
         }
@@ -2668,14 +2693,14 @@ namespace LongtailLib
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void Longtail_SetLogLevel(int level);
 
-        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        internal unsafe static extern void* Longtail_Alloc([MarshalAs(UnmanagedType.LPStr)] string context, UInt64 size);
+        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
+        internal unsafe static extern void* Longtail_Alloc(IntPtr context, UInt64 size);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern void Longtail_Free(void* data);
 
-        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        internal unsafe static extern char* Longtail_Strdup(string str);
+        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
+        internal unsafe static extern IntPtr Longtail_Strdup(IntPtr str);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern UInt64 Longtail_GetProgressAPISize();
@@ -2744,21 +2769,21 @@ namespace LongtailLib
         internal unsafe static extern UInt32 Longtail_FileInfos_GetCount(NativeFileInfos* file_infos);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
-        internal unsafe static extern UInt64 Longtail_FileInfos_GetSize(NativeFileInfos* file_infos, UInt32 index);
+        internal unsafe static extern IntPtr Longtail_FileInfos_GetPath(NativeFileInfos* file_infos, UInt32 index);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern UInt32 Longtail_FileInfos_GetPermissions(NativeFileInfos* file_infos, UInt32 index);
 
-        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern int Longtail_GetFilesRecursively(
             NativeStorageAPI* storage_api,
             NativePathFilterAPI* path_filter_api,
             NativeCancelAPI* cancel_api,
             IntPtr cancel_token,
-            [MarshalAs(UnmanagedType.LPStr)] string root_path,
+            IntPtr root_path,
             ref NativeFileInfos* out_file_infos);
 
-        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern int Longtail_CreateVersionIndex(
             NativeStorageAPI* storage_api,
             NativeHashAPI* hash_api,
@@ -2767,7 +2792,7 @@ namespace LongtailLib
             NativeProgressAPI* progress_api,
             NativeCancelAPI* cancel_api,
             IntPtr cancel_token,
-            [MarshalAs(UnmanagedType.LPStr)] string root_path,
+            IntPtr root_path,
             NativeFileInfos* file_infos,
             UInt32[] asset_tags,
             UInt32 max_chunk_size,
@@ -2776,10 +2801,10 @@ namespace LongtailLib
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern int Longtail_ReadVersionIndexFromBuffer(void* buffer, UInt64 size, ref NativeVersionIndex* out_version_index);
 
-        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern int Longtail_ReadVersionIndex(
             NativeStorageAPI* storage_api,
-            [MarshalAs(UnmanagedType.LPStr)] string path,
+            IntPtr path,
             ref NativeVersionIndex* out_version_index);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
@@ -2788,10 +2813,10 @@ namespace LongtailLib
             UInt64 size,
             ref NativeStoreIndex* out_store_index);
 
-        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern int Longtail_ReadStoreIndex(
             NativeStorageAPI* storage_api,
-            [MarshalAs(UnmanagedType.LPStr)] string path,
+            IntPtr path,
             ref NativeStoreIndex* out_store_index);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
@@ -2818,7 +2843,7 @@ namespace LongtailLib
             NativeVersionIndex* target_version,
             ref NativeVersionDiff* out_version_diff);
 
-        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern int Longtail_ChangeVersion(
             NativeBlockStoreAPI* block_store_api,
             NativeStorageAPI* version_storage_api,
@@ -2831,7 +2856,7 @@ namespace LongtailLib
             NativeVersionIndex* source_version,
             NativeVersionIndex* target_version,
             NativeVersionDiff* version_diff,
-            [MarshalAs(UnmanagedType.LPStr)] string version_path,
+            IntPtr version_path,
             int retain_permissions);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
@@ -2886,8 +2911,8 @@ namespace LongtailLib
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern NativeCompressionRegistryAPI* Longtail_CreateFullCompressionRegistry();
 
-        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        internal unsafe static extern NativeBlockStoreAPI* Longtail_CreateFSBlockStoreAPI(NativeJobAPI* job_api, NativeStorageAPI* storage_api, [MarshalAs(UnmanagedType.LPStr)] string content_path, [MarshalAs(UnmanagedType.LPStr)] string optional_block_extension);
+        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
+        internal unsafe static extern NativeBlockStoreAPI* Longtail_CreateFSBlockStoreAPI(NativeJobAPI* job_api, NativeStorageAPI* storage_api, IntPtr content_path, IntPtr optional_block_extension);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern NativeBlockStoreAPI* Longtail_CreateCacheBlockStoreAPI(NativeJobAPI* job_api, NativeBlockStoreAPI* local_block_store, NativeBlockStoreAPI* remote_block_store);
@@ -2919,25 +2944,25 @@ namespace LongtailLib
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern int Longtail_ReadStoredBlockFromBuffer(void* buffer, UInt64 size, ref NativeStoredBlock* out_stored_block);
 
-        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        internal unsafe static extern int Longtail_ReadStoredBlock(NativeStorageAPI* storage_api, [MarshalAs(UnmanagedType.LPStr)] string path, ref NativeStoredBlock* out_stored_block);
+        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
+        internal unsafe static extern int Longtail_ReadStoredBlock(NativeStorageAPI* storage_api, IntPtr path, ref NativeStoredBlock* out_stored_block);
 
-        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern int Longtail_ValidateStore(NativeStoreIndex* store_index, NativeVersionIndex* version_index);
 
-        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        internal unsafe static extern int Longtail_WriteStoredBlock(NativeStorageAPI* storage_api, NativeStoredBlock* stored_block, [MarshalAs(UnmanagedType.LPStr)] string path);
+        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
+        internal unsafe static extern int Longtail_WriteStoredBlock(NativeStorageAPI* storage_api, NativeStoredBlock* stored_block, IntPtr path);
 
-        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern int Longtail_WriteStoredBlockToBuffer(NativeStoredBlock* stored_block, ref void* out_buffer, ref UInt64 out_size);
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern void Longtail_StoredBlock_Dispose(NativeStoredBlock* stored_block);
 
-        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern UInt64 Longtail_GetBlockStoreAPISize();
 
-        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern NativeBlockStoreAPI* Longtail_MakeBlockStoreAPI(
             void* mem,
             [MarshalAs(UnmanagedType.FunctionPtr)] Longtail_DisposeFunc dispose_func,
@@ -2952,7 +2977,7 @@ namespace LongtailLib
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern UInt64 Longtail_GetCancelAPISize();
 
-        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+        [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern NativeCancelAPI* Longtail_MakeCancelAPI(
             void* mem,
             [MarshalAs(UnmanagedType.FunctionPtr)] Longtail_DisposeFunc dispose_func,
