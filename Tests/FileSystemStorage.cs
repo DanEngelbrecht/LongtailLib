@@ -28,7 +28,7 @@ namespace LongtailLib
             get { return this.m_BytesWritten; }
         }
 
-        void IStorage.OpenReadFile(string path, ref IntPtr outOpenFile)
+        public void OpenReadFile(string path, ref IntPtr outOpenFile)
         {
             try
             {
@@ -53,7 +53,7 @@ namespace LongtailLib
             }
         }
 
-        void IStorage.GetSize(IntPtr f, ref ulong outSize)
+        public void GetSize(IntPtr f, ref ulong outSize)
         {
             OpenFile openFile;
             if (!m_OpenFiles.TryGetValue(f, out openFile))
@@ -64,7 +64,7 @@ namespace LongtailLib
             outSize = (ulong)s.Length;
         }
 
-        void IStorage.Read(IntPtr f, ulong offset, ulong length, byte[] output)
+        public void Read(IntPtr f, ulong offset, ulong length, byte[] output)
         {
             OpenFile openFile;
             if (!m_OpenFiles.TryGetValue(f, out openFile))
@@ -85,7 +85,7 @@ namespace LongtailLib
             }
         }
 
-        void IStorage.OpenWriteFile(string path, ulong initialSize, ref IntPtr outOpenFile)
+        public void OpenWriteFile(string path, ulong initialSize, ref IntPtr outOpenFile)
         {
             try
             {
@@ -110,7 +110,7 @@ namespace LongtailLib
             }
         }
 
-        void IStorage.Write(IntPtr f, ulong offset, ulong length, byte[] input)
+        public void Write(IntPtr f, ulong offset, ulong length, byte[] input)
         {
             OpenFile openFile;
             if (!m_OpenFiles.TryGetValue(f, out openFile))
@@ -131,7 +131,7 @@ namespace LongtailLib
             }
         }
 
-        void IStorage.SetSize(IntPtr f, ulong length)
+        public void SetSize(IntPtr f, ulong length)
         {
             OpenFile openFile;
             if (!m_OpenFiles.TryGetValue(f, out openFile))
@@ -161,7 +161,7 @@ namespace LongtailLib
         const ushort Longtail_StorageAPI_UserWriteAccess = 0200;
         const ushort Longtail_StorageAPI_UserReadAccess = 0400;
 
-        void IStorage.SetPermissions(string path, ushort permissions)
+        public void SetPermissions(string path, ushort permissions)
         {
             string nativePath = DenormalizePath(path);
             var fileInfo = m_FileSystem.FileInfo.FromFileName(nativePath);
@@ -179,7 +179,7 @@ namespace LongtailLib
             }
         }
 
-        ushort IStorage.GetPermissions(string path)
+        public ushort GetPermissions(string path)
         {
             string nativePath = DenormalizePath(path);
             var fileInfo = m_FileSystem.FileInfo.FromFileName(nativePath);
@@ -199,7 +199,7 @@ namespace LongtailLib
             return permissions;
         }
 
-        void IStorage.CloseFile(IntPtr f)
+        public void CloseFile(IntPtr f)
         {
             OpenFile openFile;
             if (!m_OpenFiles.TryRemove(f, out openFile))
@@ -211,13 +211,13 @@ namespace LongtailLib
             Interlocked.Add(ref m_OpenFileCount, -1);
         }
 
-        void IStorage.CreateDir(string path)
+        public void CreateDir(string path)
         {
             string nativePath = DenormalizePath(path);
             m_FileSystem.Directory.CreateDirectory(nativePath);
         }
 
-        void IStorage.RenameFile(string sourcePath, string targetPath)
+        public void RenameFile(string sourcePath, string targetPath)
         {
             try
             {
@@ -231,7 +231,7 @@ namespace LongtailLib
             }
         }
 
-        string IStorage.ConcatPath(string rootPath, string subPath)
+        public string ConcatPath(string rootPath, string subPath)
         {
             // Due to bug in longtail (subPath starts with \\) we do a simple concatenation
             string parentPath = DenormalizePath(rootPath);
@@ -241,12 +241,12 @@ namespace LongtailLib
             return normalizedPath;
         }
 
-        bool IStorage.IsDir(string path)
+        public bool IsDir(string path)
         {
             return IsPathDir(DenormalizePath(path));
         }
 
-        bool IStorage.IsFile(string path)
+        public bool IsFile(string path)
         {
             string nativePath = DenormalizePath(path);
             var fileInfo = m_FileSystem.FileInfo.FromFileName(nativePath);
@@ -257,19 +257,19 @@ namespace LongtailLib
             return false;
         }
 
-        void IStorage.RemoveDir(string path)
+        public void RemoveDir(string path)
         {
             string nativePath = DenormalizePath(path);
             m_FileSystem.Directory.Delete(nativePath);
         }
 
-        void IStorage.RemoveFile(string path)
+        public void RemoveFile(string path)
         {
             string nativePath = DenormalizePath(path);
             m_FileSystem.File.Delete(nativePath);
         }
 
-        bool IStorage.StartFind(string path, ref IntPtr outIterator)
+        public bool StartFind(string path, ref IntPtr outIterator)
         {
             if (path.Length > 0 && (!IsPathDir(DenormalizePath(path))))
             {
@@ -296,7 +296,7 @@ namespace LongtailLib
             return true;
         }
 
-        bool IStorage.FindNext(IntPtr iterator)
+        public bool FindNext(IntPtr iterator)
         {
             OpenIterator openIterator;
             if (!m_OpenIterators.TryGetValue(iterator, out openIterator))
@@ -307,7 +307,7 @@ namespace LongtailLib
             return it.MoveNext();
         }
 
-        void IStorage.CloseFind(IntPtr iterator)
+        public void CloseFind(IntPtr iterator)
         {
             OpenIterator openIterator;
             if (!m_OpenIterators.TryRemove(iterator, out openIterator))
@@ -318,7 +318,7 @@ namespace LongtailLib
             openIterator.m_Iterator.Dispose();
         }
 
-        IteratorEntryProperties IStorage.GetEntryProperties(IntPtr iterator)
+        public IteratorEntryProperties GetEntryProperties(IntPtr iterator)
         {
             OpenIterator openIterator;
             if (!m_OpenIterators.TryGetValue(iterator, out openIterator))
@@ -399,13 +399,13 @@ namespace LongtailLib
             return isDir;
         }
 
-        void IStorage.LockFile(string path, ref IntPtr outLockFile)
+        public void LockFile(string path, ref IntPtr outLockFile)
         {
             // We don't expect multiple processes to run from the same cache so we do nothing here...
             // throw new NotImplementedException();
         }
 
-        void IStorage.UnlockFile(IntPtr lockFile)
+        public void UnlockFile(IntPtr lockFile)
         {
             // We don't expect multiple processes to run from the same cache so we do nothing here...
             // throw new NotImplementedException();
