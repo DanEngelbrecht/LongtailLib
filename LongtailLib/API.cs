@@ -104,6 +104,7 @@ namespace LongtailLib
         IteratorEntryProperties GetEntryProperties(IntPtr iterator);
         void LockFile(string path, ref IntPtr outLockFile);
         void UnlockFile(IntPtr lockFile);
+        string GetParentPath(string path);
     }
 
     public unsafe sealed class BlockStoreAPI : IDisposable
@@ -2077,6 +2078,23 @@ namespace LongtailLib
                             return errno;
                         }
                     };
+                m_GetParentPathFunc =
+                    (SafeNativeMethods.NativeStorageAPI* storage_api, IntPtr path) =>
+                    {
+                        try
+                        {
+                            string parentPath = m_Storage.GetParentPath(SafeNativeMethods.StringFromNativeUtf8(path));
+                            IntPtr nativeString = SafeNativeMethods.NativeUtf8FromString(parentPath);
+                            var result = SafeNativeMethods.Longtail_Strdup(nativeString);
+                            SafeNativeMethods.FreeNativeUtf8String(nativeString);
+                            return result;
+                        }
+                        catch (Exception /*e*/)
+                        {
+                            //                            Log.Information("StorageAPI::GetParentPath failed with {@e}", e);
+                            return IntPtr.Zero;
+                        }
+                    };
                 _Native = new StorageAPI(SafeNativeMethods.Longtail_MakeStorageAPI(
                     mem,
                     m_Dispose,
@@ -2101,7 +2119,8 @@ namespace LongtailLib
                     m_CloseFindFunc,
                     m_GetEntryPropertiesFunc,
                     m_LockFileFunc,
-                    m_UnlockFileFunc));
+                    m_UnlockFileFunc,
+                    m_GetParentPathFunc));
             }
             SafeNativeMethods.Longtail_DisposeFunc m_Dispose;
             SafeNativeMethods.Longtail_Storage_OpenReadFileFunc m_OpenReadFileFunc;
@@ -2126,6 +2145,7 @@ namespace LongtailLib
             SafeNativeMethods.Longtail_Storage_GetEntryPropertiesFunc m_GetEntryPropertiesFunc;
             SafeNativeMethods.Longtail_Storage_LockFileFunc m_LockFileFunc;
             SafeNativeMethods.Longtail_Storage_UnlockFileFunc m_UnlockFileFunc;
+            SafeNativeMethods.Longtail_Storage_GetParentPathFunc m_GetParentPathFunc;
             ConcurrentDictionary<IntPtr, IntPtr> m_AllocatedStrings;
 
             IStorage m_Storage;
@@ -2462,6 +2482,7 @@ namespace LongtailLib
         public unsafe delegate int Longtail_Storage_GetEntryPropertiesFunc(NativeStorageAPI* storage_api, IntPtr iterator, ref NativeStorageAPIProperties out_properties);
         public unsafe delegate int Longtail_Storage_LockFileFunc(NativeStorageAPI* storage_api, IntPtr path, ref IntPtr out_lock_file);
         public unsafe delegate int Longtail_Storage_UnlockFileFunc(NativeStorageAPI* storage_api, IntPtr lock_file);
+        public unsafe delegate IntPtr Longtail_Storage_GetParentPathFunc(NativeStorageAPI* storage_api, IntPtr path);
 
         public unsafe delegate int Longtail_CancelAPI_CreateTokenFunc(NativeCancelAPI* cancel_api, ref IntPtr out_token);
         public unsafe delegate int Longtail_CancelAPI_CancelFunc(NativeCancelAPI* cancel_api, IntPtr token);
@@ -2496,7 +2517,8 @@ namespace LongtailLib
             Longtail_Storage_CloseFindFunc close_find_func,
             Longtail_Storage_GetEntryPropertiesFunc get_entry_properties_func,
             Longtail_Storage_LockFileFunc lock_file_func,
-            Longtail_Storage_UnlockFileFunc unlock_file_func);
+            Longtail_Storage_UnlockFileFunc unlock_file_func,
+            Longtail_Storage_GetParentPathFunc get_parent_path_func);
 
         internal unsafe struct NativeAPI { }
         internal unsafe struct NativeProgressAPI { }

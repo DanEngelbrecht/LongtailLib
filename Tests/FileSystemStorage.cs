@@ -411,6 +411,11 @@ namespace LongtailLib
             // throw new NotImplementedException();
         }
 
+        public string GetParentPath(string path)
+        {
+            return m_FileSystem.Path.GetDirectoryName(path);
+        }
+
         IFileSystem m_FileSystem;
 
         struct OpenFile
