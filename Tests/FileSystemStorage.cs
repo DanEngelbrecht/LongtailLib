@@ -413,7 +413,12 @@ namespace LongtailLib
 
         public string GetParentPath(string path)
         {
-            return m_FileSystem.Path.GetDirectoryName(path);
+            string parentPath = m_FileSystem.Path.GetDirectoryName(path);
+            if (parentPath.Length == 0)
+            {
+                return null;
+            }
+            return parentPath;
         }
 
         IFileSystem m_FileSystem;
