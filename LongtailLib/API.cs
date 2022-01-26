@@ -1172,15 +1172,16 @@ namespace LongtailLib
                     minBlockUsagePercent,
                     wrappedAsyncGetExistingContentAPI.Native);
                 pinnedArray.Free();
-                StoreIndex result = wrappedAsyncGetExistingContentAPI.Result;
-                if (err == 0)
-                {
-                    err = wrappedAsyncGetExistingContentAPI.Err;
-                }
-                wrappedAsyncGetExistingContentAPI.Dispose();
                 if (err != 0)
                 {
+                    wrappedAsyncGetExistingContentAPI.Dispose();
                     ThrowExceptionFromErrno("GetExistingContent", "", err);
+                }
+                StoreIndex result = wrappedAsyncGetExistingContentAPI.Result;
+                wrappedAsyncGetExistingContentAPI.Dispose();
+                if (wrappedAsyncGetExistingContentAPI.Err != 0)
+                {
+                    ThrowExceptionFromErrno("GetExistingContent", "", wrappedAsyncGetExistingContentAPI.Err);
                 }
                 return result;
             });
