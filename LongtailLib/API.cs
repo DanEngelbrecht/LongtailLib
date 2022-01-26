@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -572,7 +573,7 @@ namespace LongtailLib
         public const int LOG_LEVEL_ERROR = 3;
         public const int LOG_LEVEL_OFF = 4;
 
-        public static void ThrowExceptionFromErrno(string functionName, string extraInfo, int errno)
+        public static void ThrowExceptionFromErrno(string extraInfo, int errno, [CallerMemberName] string functionName = null)
         {
             switch (errno)
             {
@@ -735,7 +736,7 @@ namespace LongtailLib
             {
                 return new FileInfos(nativeFileInfos);
             }
-            ThrowExceptionFromErrno("GetFilesRecursively", rootPath, err);
+            ThrowExceptionFromErrno(rootPath, err);
             return null;
         }
 
@@ -776,7 +777,7 @@ namespace LongtailLib
             public WrappedAsyncFlushAPI()
             {
                 UInt64 mem_size = SafeNativeMethods.Longtail_GetAsyncFlushAPISize();
-                byte* mem = (byte*)API.Alloc("WrappedAsyncFlushAPI", mem_size);
+                byte* mem = (byte*)API.Alloc(nameof(WrappedAsyncFlushAPI), mem_size);
                 if (mem == null)
                 {
                     throw new OutOfMemoryException();
@@ -826,7 +827,7 @@ namespace LongtailLib
             public WrappedAsyncGetExistingContentAPI()
             {
                 UInt64 mem_size = SafeNativeMethods.Longtail_GetAsyncGetExistingContentAPISize();
-                byte* mem = (byte*)API.Alloc("WrappedAsyncGetExistingContentAPI", mem_size);
+                byte* mem = (byte*)API.Alloc(nameof(WrappedAsyncGetExistingContentAPI), mem_size);
                 if (mem == null)
                 {
                     throw new OutOfMemoryException();
@@ -897,7 +898,7 @@ namespace LongtailLib
                 wrappedAsyncFlushAPI.Dispose();
                 if (err != 0)
                 {
-                    ThrowExceptionFromErrno("BlockStoreFlush", "", err);
+                    ThrowExceptionFromErrno("", err);
                 }
             });
         }
@@ -954,7 +955,7 @@ namespace LongtailLib
             {
                 return new VersionIndex(nativeVersionIndex);
             }
-            ThrowExceptionFromErrno("CreateVersionIndex", rootPath, err);
+            ThrowExceptionFromErrno(rootPath, err);
             return null;
         }
         public unsafe static VersionIndex ReadVersionIndexFromBuffer(byte[] buffer)
@@ -970,7 +971,7 @@ namespace LongtailLib
             {
                 return new VersionIndex(nativeVersionIndex);
             }
-            ThrowExceptionFromErrno("ReadVersionIndexFromBuffer", "", err);
+            ThrowExceptionFromErrno("", err);
             return null;
         }
         public unsafe static VersionIndex ReadVersionIndex(StorageAPI storageAPI, string path)
@@ -990,7 +991,7 @@ namespace LongtailLib
             {
                 return new VersionIndex(nativeVersionIndex);
             }
-            ThrowExceptionFromErrno("ReadVersionIndex", path, err);
+            ThrowExceptionFromErrno(path, err);
             return null;
         }
         public unsafe static StoreIndex ReadStoreIndexFromBuffer(byte[] buffer)
@@ -1006,7 +1007,7 @@ namespace LongtailLib
             {
                 return new StoreIndex(nativeStoreIndex);
             }
-            ThrowExceptionFromErrno("ReadStoreIndexFromBuffer", "", err);
+            ThrowExceptionFromErrno("", err);
             return null;
         }
         public unsafe static StoreIndex ReadStoreIndex(StorageAPI storageAPI, string path)
@@ -1026,7 +1027,7 @@ namespace LongtailLib
             {
                 return new StoreIndex(nativeStoreIndex);
             }
-            ThrowExceptionFromErrno("ReadStoreIndex", path, err);
+            ThrowExceptionFromErrno(path, err);
             return null;
         }
         public unsafe static StoreIndex CreateMissingContent(HashAPI hashAPI, StoreIndex storeIndex, VersionIndex version, UInt32 maxBlockSize, UInt32 maxChunksPerBlock)
@@ -1050,7 +1051,7 @@ namespace LongtailLib
             {
                 return new StoreIndex(nativeStoreIndex);
             }
-            ThrowExceptionFromErrno("CreateMissingContent", "", err);
+            ThrowExceptionFromErrno("", err);
             return null;
         }
 
@@ -1079,7 +1080,7 @@ namespace LongtailLib
                 Array.Copy(chunkHashes, result, (int)chunkCount);
                 return result;
             }
-            ThrowExceptionFromErrno("GetRequiredChunkHashes", "", err);
+            ThrowExceptionFromErrno("", err);
             return null;
         }
 
@@ -1106,7 +1107,7 @@ namespace LongtailLib
             {
                 return new StoreIndex(nativeStoreIndex);
             }
-            ThrowExceptionFromErrno("GetExistingStoreIndex", "", err);
+            ThrowExceptionFromErrno("", err);
             return null;
         }
         /*        public unsafe static ContentIndex GetExistingContent(ContentIndex referenceContentIndex, ContentIndex contentIndex)
@@ -1126,7 +1127,7 @@ namespace LongtailLib
                     {
                         return new ContentIndex(nativeContentIndex);
                     }
-                    ThrowExceptionFromErrno("GetExistingContent", "", err);
+                    ThrowExceptionFromErrno("", err);
                     return null;
                 }
                 public unsafe static ContentIndex MergeContentIndex(
@@ -1152,7 +1153,7 @@ namespace LongtailLib
                     {
                         return new ContentIndex(nativeContentIndex);
                     }
-                    ThrowExceptionFromErrno("MergeContentIndex", "", err);
+                    ThrowExceptionFromErrno("", err);
                     return null;
                 }*/
 
@@ -1175,13 +1176,13 @@ namespace LongtailLib
                 if (err != 0)
                 {
                     wrappedAsyncGetExistingContentAPI.Dispose();
-                    ThrowExceptionFromErrno("GetExistingContent", "", err);
+                    ThrowExceptionFromErrno("", err);
                 }
                 StoreIndex result = wrappedAsyncGetExistingContentAPI.Result;
                 wrappedAsyncGetExistingContentAPI.Dispose();
                 if (wrappedAsyncGetExistingContentAPI.Err != 0)
                 {
-                    ThrowExceptionFromErrno("GetExistingContent", "", wrappedAsyncGetExistingContentAPI.Err);
+                    ThrowExceptionFromErrno("", wrappedAsyncGetExistingContentAPI.Err);
                 }
                 return result;
             });
@@ -1193,7 +1194,7 @@ namespace LongtailLib
             int err = SafeNativeMethods.Longtail_ValidateStore(storeIndex.Native, versionIndex.Native);
             if (err != 0)
             {
-                ThrowExceptionFromErrno("ValidateStore", "", err);
+                ThrowExceptionFromErrno("", err);
             }
         }
         public unsafe static VersionDiff CreateVersionDiff(
@@ -1218,7 +1219,7 @@ namespace LongtailLib
             {
                 return new VersionDiff(nativeVersionDiff);
             }
-            ThrowExceptionFromErrno("CreateVersionDiff", "", err);
+            ThrowExceptionFromErrno("", err);
             return null;
         }
         public unsafe static void ChangeVersion(
@@ -1281,7 +1282,7 @@ namespace LongtailLib
             {
                 return;
             }
-            ThrowExceptionFromErrno("ChangeVersion", versionPath, err);
+            ThrowExceptionFromErrno(versionPath, err);
         }
         public unsafe static StorageAPI CreateFSStorageAPI()
         {
@@ -1345,7 +1346,7 @@ namespace LongtailLib
             {
                 return new HashAPI(hashAPI, false);
             }
-            ThrowExceptionFromErrno("GetHashAPI", hashIdentifier.ToString(), err);
+            ThrowExceptionFromErrno(hashIdentifier.ToString(), err);
             return null;
         }
         public unsafe static CompressionRegistryAPI CreateFullCompressionRegistry()
@@ -1440,7 +1441,7 @@ namespace LongtailLib
                 }
                 return outStats;
             }
-            ThrowExceptionFromErrno("BlockStoreGetStats", "", err);
+            ThrowExceptionFromErrno("", err);
             return new BlockStoreStats();
         }
 
@@ -1460,7 +1461,7 @@ namespace LongtailLib
             {
                 return new StoredBlock(nativeStoredBlock);
             }
-            ThrowExceptionFromErrno("ReadStoredBlockFromBuffer", "", err);
+            ThrowExceptionFromErrno("", err);
             return new StoredBlock(null);
         }
 
@@ -1481,7 +1482,7 @@ namespace LongtailLib
             {
                 return new StoredBlock(nativeStoredBlock);
             }
-            ThrowExceptionFromErrno("ReadStoredBlockFromBuffer", path, err);
+            ThrowExceptionFromErrno(path, err);
             return new StoredBlock(null);
         }
 
@@ -1510,7 +1511,7 @@ namespace LongtailLib
             int err = SafeNativeMethods.Longtail_WriteStoredBlockToBuffer(cStoredBlock, ref buffer, ref size);
             if (err != 0)
             {
-                ThrowExceptionFromErrno("WriteStoredBlockToBuffer", "", err);
+                ThrowExceptionFromErrno("", err);
             }
             byte[] result = new byte[size];
             Marshal.Copy((IntPtr)buffer, result, 0, (int)size);
@@ -1524,7 +1525,7 @@ namespace LongtailLib
             {
                 m_BlockStore = blockStore;
                 UInt64 mem_size = SafeNativeMethods.Longtail_GetBlockStoreAPISize();
-                byte* mem = (byte*)API.Alloc("BlockStoreHandle", mem_size);
+                byte* mem = (byte*)API.Alloc(nameof(BlockStoreHandle), mem_size);
                 if (mem == null)
                 {
                     throw new OutOfMemoryException();
@@ -1728,7 +1729,7 @@ namespace LongtailLib
                 m_Storage = storage;
                 m_AllocatedStrings = new ConcurrentDictionary<IntPtr, IntPtr>(2, 2);
                 UInt64 mem_size = SafeNativeMethods.Longtail_GetStorageAPISize();
-                byte* mem = (byte*)API.Alloc("StorageHandle", mem_size);
+                byte* mem = (byte*)API.Alloc(nameof(StorageHandle), mem_size);
                 if (mem == null)
                 {
                     throw new OutOfMemoryException();
@@ -2173,7 +2174,7 @@ namespace LongtailLib
                 }
                 m_ProgressFunc = progressFunc;
                 UInt64 mem_size = SafeNativeMethods.Longtail_GetProgressAPISize();
-                m_ProgressMem = (byte*)API.Alloc("ProgressHandle", mem_size);
+                m_ProgressMem = (byte*)API.Alloc(nameof(ProgressHandle), mem_size);
                 if (m_ProgressMem == null)
                 {
                     throw new OutOfMemoryException();
@@ -2237,7 +2238,7 @@ namespace LongtailLib
                 }
                 m_CancellationToken = cancellationToken;
                 UInt64 mem_size = SafeNativeMethods.Longtail_GetCancelAPISize();
-                byte* mem = (byte*)API.Alloc("CancelHandle", mem_size);
+                byte* mem = (byte*)API.Alloc(nameof(CancelHandle), mem_size);
                 if (mem == null)
                 {
                     throw new OutOfMemoryException();
@@ -2321,7 +2322,7 @@ namespace LongtailLib
                 }
                 m_PathFilterFunc = pathFilterFunc;
                 UInt64 mem_size = SafeNativeMethods.Longtail_GetPathFilterAPISize();
-                byte* mem = (byte*)API.Alloc("PathFilterHandle", mem_size);
+                byte* mem = (byte*)API.Alloc(nameof(PathFilterHandle), mem_size);
                 if (mem == null)
                 {
                     throw new OutOfMemoryException();
@@ -2967,7 +2968,7 @@ namespace LongtailLib
 
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern int Longtail_BlockStore_GetStats(NativeBlockStoreAPI* block_store_api, ref NativeBlockStoreStats out_stats);
-        
+
         [DllImport(LongtailDLLName, CallingConvention = CallingConvention.Cdecl)]
         internal unsafe static extern int Longtail_ReadStoredBlockFromBuffer(void* buffer, UInt64 size, ref NativeStoredBlock* out_stored_block);
 
