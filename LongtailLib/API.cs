@@ -2085,6 +2085,10 @@ namespace LongtailLib
                         try
                         {
                             string parentPath = m_Storage.GetParentPath(SafeNativeMethods.StringFromNativeUtf8(path));
+                            if (parentPath == null)
+                            {
+                                return IntPtr.Zero;
+                            }
                             IntPtr nativeString = SafeNativeMethods.NativeUtf8FromString(parentPath);
                             var result = SafeNativeMethods.Longtail_Strdup(nativeString);
                             SafeNativeMethods.FreeNativeUtf8String(nativeString);
