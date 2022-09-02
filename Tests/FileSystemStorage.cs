@@ -1,4 +1,5 @@
-﻿using System;
+﻿using LongtailLib;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -6,9 +7,9 @@ using System.IO.Abstractions;
 using System.Runtime.InteropServices;
 using System.Threading;
 
-namespace LongtailLib
+namespace Tests
 {
-    public class FileSystemStorage : IStorage, IDisposable
+    internal class FileSystemStorage : IStorage, IDisposable
     {
         public FileSystemStorage(IFileSystem fileSystem)
         {

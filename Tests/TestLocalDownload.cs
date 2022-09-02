@@ -1,5 +1,4 @@
 ﻿using System;
-using System.IO;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Diagnostics;
@@ -11,60 +10,7 @@ using System.Text;
 
 namespace Tests
 {
-    class TestBlockStorage : IBlockStore
-    {
-        public TestBlockStorage(string storagePath)
-        {
-            m_StoragePath = storagePath;
-        }
-
-        public void PreflightGet(UInt64[] blockHashes, OnPreflightStartedComplete completeCallback)
-        {
-            completeCallback(blockHashes, null);
-        }
-
-        public void GetStoredBlock(UInt64 blockHash, OnGetBlockComplete completeCallback)
-        {
-            string blockName = string.Format("0x{0:X16}", blockHash).ToLower();
-            string blockPath = "\\chunks\\" + blockName.Substring(2, 4) + "\\" + blockName + ".lrb";
-            byte[] storedBlockBuffer = File.ReadAllBytes(m_StoragePath + blockPath);
-            StoredBlock storedBlock = API.ReadStoredBlockFromBuffer(storedBlockBuffer);
-            completeCallback(storedBlock, null);
-        }
-
-        public void PutStoredBlock(StoredBlock storedBlock, OnPutBlockComplete completeCallback)
-        {
-
-            throw new NotImplementedException();
-        }
-
-        public BlockStoreStats GetStats()
-        {
-            return new BlockStoreStats();
-        }
-
-        public void GetExistingContent(UInt64[] chunkHashes, UInt32 minBlockUsagePercent, OnGetExistingContentComplete completeCallback)
-        {
-            string storeContentIndexPath = m_StoragePath + "\\store.lsi";
-            byte[] storedBlockBuffer = File.ReadAllBytes(storeContentIndexPath);
-            StoreIndex storeIndex = API.ReadStoreIndexFromBuffer(storedBlockBuffer);
-            completeCallback(storeIndex, null);
-        }
-
-        public void Flush(OnFlushComplete completeCallback)
-        {
-            completeCallback(null);
-        }
-
-        public void PruneBlocks(ulong[] blockKeepHashes, OnPruneComplete completeCallback)
-        {
-            completeCallback(0, null);
-        }
-
-        private string m_StoragePath;
-    }
-
-    class DebugProgress
+    internal class DebugProgress
     {
         public DebugProgress(string title)
         {
@@ -115,17 +61,9 @@ namespace Tests
             var cacheFS = new MockFileSystem();
             var targetFS = new MockFileSystem();
 
-            // Ugly and evil hack to get to test folder, but this entire class is a test-hack so...
-            string cwd = localFS.Directory.GetCurrentDirectory();
-            string projectRootDir = "Tests";
-            while (!projectRootDir.Equals(localFS.Directory.GetParent(cwd).Name, StringComparison.InvariantCultureIgnoreCase))
-            {
-                cwd = localFS.Directory.GetParent(cwd).FullName;
-            }
-            string projectRoot = localFS.Directory.GetParent(cwd).FullName;
-
-            string sourcePath = localFS.Path.Combine(new string[] { projectRoot, "TestData", "store", "index", "totalcmd.lvi" });
-            string storePath = localFS.Path.Combine(new string[] { projectRoot, "TestData", "store" });
+            string testDataPath = TestData.GetTestDataPath(localFS);
+            string sourcePath = localFS.Path.Combine(new string[] { testDataPath, "store", "index", "totalcmd.lvi" });
+            string storePath = localFS.Path.Combine(new string[] { testDataPath, "store" });
             string cachePath = "cache";
             string targetPath = "totalcmd";
             IFileSystem p = new FileSystem();
@@ -180,7 +118,7 @@ namespace Tests
                 (UInt32 totalCount, UInt32 doneCount) => { indexingProgress.OnProgress(totalCount, doneCount); },
                 cancellationToken);
 
-            TestBlockStorage remoteBlockStore = new TestBlockStorage(storePath);
+            FileSystemBlockStore remoteBlockStore = new FileSystemBlockStore(localFS, storePath);
 
             DebugProgress updateProgress = new DebugProgress("Updating");
 
